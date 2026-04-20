@@ -1,0 +1,13 @@
+{
+  "session_name": "Touch-Lab Session",
+  "osc_receive_port": 9000,
+  "vu_send_host": "127.0.0.1",
+  "vu_send_port": 9001,
+  "vu_interval_ms": 50,
+  "channels": [
+    { "index": 1, "name": "Bas",      "type": "mono" },
+    { "index": 2, "name": "Piano",    "type": "mono" },
+    { "index": 3, "name": "Gitaar",   "type": "mono" },
+    { "index": 4, "name": "Zang",     "type": "mono" }
+  ]
+}
