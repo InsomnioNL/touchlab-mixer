@@ -612,14 +612,14 @@ function mkStrip(ch){
   // PAN knob
   var kn=document.createElement('div');kn.className='knob';kn.id='kn-'+ch.index+'-pan';
   kn.style.width='22px';kn.style.height='22px';
-  initK(kn,ch.pan||.5,22,v=>{ch.pan=v;send({type:'pan',channel:ch.index,value:v});saveChannel(ch);},'green');
+  kn.dataset.default=0.5;initK(kn,ch.pan||.5,22,v=>{ch.pan=v;send({type:'pan',channel:ch.index,value:v});saveChannel(ch);},'green');
   var kw=document.createElement('div');kw.className='kw';
   var kl=document.createElement('div');kl.className='kl';kl.textContent='PAN';
   kw.appendChild(kn);kw.appendChild(kl);
   // FX knob
   var fxkn=document.createElement('div');fxkn.className='knob';fxkn.id='kn-'+ch.index+'-fx';
   fxkn.style.width='20px';fxkn.style.height='20px';
-  initK(fxkn,ch.fx||0,20,v=>{ch.fx=v;send({type:'fx',channel:ch.index,value:v});saveChannel(ch);},'purple');
+  fxkn.dataset.default=0;initK(fxkn,ch.fx||0,20,v=>{ch.fx=v;send({type:'fx',channel:ch.index,value:v});saveChannel(ch);},'purple');
   var fxkw=document.createElement('div');fxkw.className='kw';
   var fxkl=document.createElement('div');fxkl.className='kl';fxkl.textContent='FX';
   fxkw.appendChild(fxkn);fxkw.appendChild(fxkl);
@@ -700,9 +700,9 @@ function buildMasterFader(){
 // ── Divider knobs init ─────────────────────────────────────────────────────
 function initDividerKnobs(){
   var mpk=document.getElementById('kn-m-pan');
-  if(mpk&&!mpk.querySelector('svg')) initK(mpk,master.pan||.5,26,v=>{master.pan=v;send({type:'masterPan',value:v});saveMaster();},'amber');
+  if(mpk&&!mpk.querySelector('svg')) mpk.dataset.default=0.5;initK(mpk,master.pan||.5,26,v=>{master.pan=v;send({type:'masterPan',value:v});saveMaster();},'amber');
   var mfx=document.getElementById('kn-m-fx');
-  if(mfx&&!mfx.querySelector('svg')) initK(mfx,master.fxReturn||0,26,v=>{master.fxReturn=v;send({type:'fxReturn',value:v});saveMaster();},'amber');
+  if(mfx&&!mfx.querySelector('svg')) mfx.dataset.default=0;initK(mfx,master.fxReturn||0,26,v=>{master.fxReturn=v;send({type:'fxReturn',value:v});saveMaster();},'amber');
   // Mute button master
   var mmb=document.getElementById('btn-m-mute');
   if(!mmb){
