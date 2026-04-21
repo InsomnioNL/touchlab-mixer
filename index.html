@@ -355,15 +355,12 @@ function connect(url){
     if(msg.type==='init'){
       sessionName=msg.session||'default';
       channels=msg.channels.map(c=>({...c,vu:-60}));
-      // Laad channel memory
       channels.forEach(loadChannelMemory);
-      // Master: pan+fx uit memory, vol altijd 0
       var mm=loadMasterMemory();
       master={vol:0,pan:mm?mm.pan:0.5,fxReturn:mm?mm.fxReturn:0};
-      // Toon sessienaam in edit view
-      var sn=document.getElementById('session-name');
-      if(sn)sn.textContent=sessionName;
-      renderAll();return}
+      renderAll();
+      setStatus(true);
+      return}
     if(msg.type==='vu'){masterVu=msg.masterVu||-60;(msg.channels||[]).forEach(u=>{var c=channels.find(x=>x.index===u.index);if(c)c.vu=u.vu});updateVUs();return}
     var ch=channels.find(c=>c.index===msg.channel);
     if(ch){
