@@ -359,7 +359,13 @@ function connect(url){
       var mm=loadMasterMemory();
       master={vol:0,pan:mm?mm.pan:0.5,fxReturn:mm?mm.fxReturn:0};
       renderAll();
-      setStatus(true);
+      // Sessienaam direct in DOM zetten
+      var sn=document.getElementById('session-name');
+      if(sn&&sessionName!=='default') sn.textContent=sessionName;
+      var st=document.getElementById('status-edit');
+      if(st){st.className='status-txt live';st.textContent='LIVE · '+channels.length+' CH';}
+      document.getElementById('ws-url').className='ws-input connected';
+      var fe=document.getElementById('fp-edit');if(fe)fe.className='fp-edit live';
       return}
     if(msg.type==='vu'){masterVu=msg.masterVu||-60;(msg.channels||[]).forEach(u=>{var c=channels.find(x=>x.index===u.index);if(c)c.vu=u.vu});updateVUs();return}
     var ch=channels.find(c=>c.index===msg.channel);
