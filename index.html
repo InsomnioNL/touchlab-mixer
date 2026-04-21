@@ -163,7 +163,7 @@ html,body{
 
 /* Verticale divider */
 .vdiv{
-  width:68px;flex-shrink:0;
+  width:62px;flex-shrink:0;
   display:flex;flex-direction:column;align-items:center;
   background:linear-gradient(180deg,rgba(0,0,0,0.0) 0%,rgba(20,4,45,0.08) 4%,rgba(45,10,88,0.45) 16%,rgba(25,6,55,0.82) 48%,rgba(12,2,35,0.93) 100%);
   border-left:1px solid rgba(138,54,236,.2);
@@ -187,7 +187,7 @@ html,body{
 }
 .bank-badge.visible{opacity:1;}
 .vdiv-splash img{
-  height:64px;width:auto;opacity:0.88;
+  height:58px;width:auto;opacity:0.88;
   flex-shrink:0;
   transform:rotate(-90deg);
   -webkit-mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,1) 6%,rgba(0,0,0,1) 94%,transparent 100%);
@@ -202,7 +202,7 @@ html,body{
 
 /* Master strip */
 .master-strip{
-  width:68px;flex-shrink:0;
+  flex-shrink:0;
   display:flex;flex-direction:column;align-items:center;
   gap:4px;padding:5px 4px;
   background:linear-gradient(180deg,rgba(20,4,45,0.10) 0%,rgba(40,10,80,0.35) 6%,rgba(55,12,95,0.60) 14%,rgba(25,6,55,0.82) 45%,rgba(12,2,35,0.92) 100%);
@@ -456,13 +456,15 @@ function updateVUs(){
 }
 
 // ── Knob ───────────────────────────────────────────────────────────────────
-function initK(el,val,size,cb){
-  var iM=el.id.startsWith('kn-m-');
-  if(iM)el.style.borderColor='rgba(138,54,236,0.28)';
+function initK(el,val,size,cb,color){
+  var clr=color||'green';
+  var strokeColor=clr==='purple'?'var(--accent2)':'var(--green)';
+  var borderColor=clr==='purple'?'rgba(138,54,236,0.28)':'rgba(69,230,143,0.22)';
+  el.style.borderColor=borderColor;
   var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.setAttribute('width',size);svg.setAttribute('height',size);
   var ln=document.createElementNS('http://www.w3.org/2000/svg','line');
-  ln.setAttribute('stroke',iM?'var(--accent2)':'var(--green)');
+  ln.setAttribute('stroke',strokeColor);
   ln.setAttribute('stroke-width','1.5');ln.setAttribute('stroke-linecap','round');
   svg.appendChild(ln);el.appendChild(svg);setKL(ln,val,size);
   var drag=false,sy=0,sv=val;
@@ -506,14 +508,14 @@ function mkStrip(ch){
   // PAN knob
   var kn=document.createElement('div');kn.className='knob';kn.id='kn-'+ch.index+'-pan';
   kn.style.width='22px';kn.style.height='22px';
-  initK(kn,ch.pan||.5,22,v=>{ch.pan=v;send({type:'pan',channel:ch.index,value:v})});
+  initK(kn,ch.pan||.5,22,v=>{ch.pan=v;send({type:'pan',channel:ch.index,value:v})},'green');
   var kw=document.createElement('div');kw.className='kw';
   var kl=document.createElement('div');kl.className='kl';kl.textContent='PAN';
   kw.appendChild(kn);kw.appendChild(kl);
   // FX knob
   var fxkn=document.createElement('div');fxkn.className='knob';fxkn.id='kn-'+ch.index+'-fx';
   fxkn.style.width='20px';fxkn.style.height='20px';
-  initK(fxkn,ch.fx||0,20,v=>{ch.fx=v;send({type:'fx',channel:ch.index,value:v})});
+  initK(fxkn,ch.fx||0,20,v=>{ch.fx=v;send({type:'fx',channel:ch.index,value:v})},'purple');
   var fxkw=document.createElement('div');fxkw.className='kw';
   var fxkl=document.createElement('div');fxkl.className='kl';fxkl.textContent='FX';
   fxkw.appendChild(fxkn);fxkw.appendChild(fxkl);
@@ -559,9 +561,9 @@ function buildMasterFader(){
 // ── Divider knobs init ─────────────────────────────────────────────────────
 function initDividerKnobs(){
   var mpk=document.getElementById('kn-m-pan');
-  if(mpk&&!mpk.querySelector('svg')) initK(mpk,master.pan||.5,26,v=>{master.pan=v;send({type:'masterPan',value:v})});
+  if(mpk&&!mpk.querySelector('svg')) initK(mpk,master.pan||.5,26,v=>{master.pan=v;send({type:'masterPan',value:v})},'green');
   var mfx=document.getElementById('kn-m-fx');
-  if(mfx&&!mfx.querySelector('svg')) initK(mfx,master.fxReturn||0,26,v=>{master.fxReturn=v;send({type:'fxReturn',value:v})});
+  if(mfx&&!mfx.querySelector('svg')) initK(mfx,master.fxReturn||0,26,v=>{master.fxReturn=v;send({type:'fxReturn',value:v})},'purple');
   // Mute button master
   var mmb=document.getElementById('btn-m-mute');
   if(!mmb){
@@ -582,15 +584,26 @@ function initDividerKnobs(){
 function renderStrips(){
   var c=document.getElementById('strips');c.innerHTML='';
   var chs=getBankChs();
-  // Altijd 10 strips tonen
-  var N=Math.max(10,chs.length);
-  for(var i=0;i<N;i++){
+  var N=Math.max(chs.length,1);
+  // Toon exact aantal actieve kanalen (min 1), geen lege strips als er echte zijn
+  var showN=chs.length>0?chs.length:10;
+  for(var i=0;i<showN;i++){
     if(i<chs.length){
       c.appendChild(mkStrip(chs[i]));
     } else {
       c.appendChild(mkEmptyStrip(i+1));
     }
   }
+  // Master breedte = 1.5x channel breedte
+  setTimeout(function(){
+    var strips=c.querySelectorAll('.strip');
+    if(strips.length>0){
+      var chW=strips[0].offsetWidth;
+      var masterW=Math.round(chW*1.5);
+      var ms=document.getElementById('master-strip');
+      if(ms) ms.style.width=masterW+'px';
+    }
+  },50);
 }
 function renderAll(){
   var N=channels.length,tabs=document.getElementById('bank-tabs');
