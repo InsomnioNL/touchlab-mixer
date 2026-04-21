@@ -661,23 +661,22 @@ function buildMasterFader(){
   var H=ms?Math.max(160,ms.offsetHeight-30):240;
   var R=H-PAD*2-13;
 
-  // Container met L VU + fader + R VU
   var wrap=document.createElement('div');
-  wrap.style.cssText='position:relative;width:100%;height:'+H+'px;display:flex;align-items:stretch;gap:2px;';
+  wrap.style.cssText='position:relative;width:100%;height:'+H+'px;';
 
-  // L VU — smal, links
+  // L VU — links van midden
   var segsL=document.createElement('div');
   segsL.id='sg-ml';
-  segsL.style.cssText='position:absolute;left:0;top:4px;bottom:4px;width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
+  segsL.style.cssText='position:absolute;left:50%;margin-left:-7px;top:4px;bottom:4px;width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
   for(var i=0;i<SEGS;i++){var s=document.createElement('div');s.className='fvu-seg';segsL.appendChild(s);}
 
-  // R VU — smal, rechts
+  // R VU — rechts van midden
   var segsR=document.createElement('div');
   segsR.id='sg-mr';
-  segsR.style.cssText='position:absolute;right:0;top:4px;bottom:4px;width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
+  segsR.style.cssText='position:absolute;left:50%;margin-left:2px;top:4px;bottom:4px;width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
   for(var i=0;i<SEGS;i++){var s=document.createElement('div');s.className='fvu-seg';segsR.appendChild(s);}
 
-  // Fader thumb
+  // Thumb over L+R heen
   var thumb=document.createElement('div');thumb.className='fvu-thumb';thumb.id='th-m';
   var line=document.createElement('div');line.className='fvu-line';thumb.appendChild(line);
   thumb.style.top=((1-master.vol)*R+PAD+6.5)+'px';
@@ -687,7 +686,6 @@ function buildMasterFader(){
   wrap.appendChild(thumb);
   mc.appendChild(wrap);
 
-  // Drag
   var drag=false,sy=0,sv=master.vol;
   function dn(y){drag=true;sy=y;sv=1-(parseFloat(thumb.style.top)-PAD-6.5)/R;}
   function mv(y){if(!drag)return;var v=Math.max(0,Math.min(1,sv+(sy-y)/R));thumb.style.top=((1-v)*R+PAD+6.5)+'px';master.vol=v;send({type:'masterVol',value:v});saveMaster();}
