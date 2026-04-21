@@ -776,7 +776,7 @@ setTimeout(()=>{
     var names=['Bas','Piano','Gitaar','Zang','Viool','Cello','Fluit','Hobo','Hoorn','Perc'];
     channels=names.map((n,i)=>({index:i+1,name:n,vol:.75,pan:.5,fx:0,mute:false,solo:false,vu:-35}));
     master={vol:0,pan:.5,fxReturn:0};
-    goLive();
+    renderAll();
 
   }
 },2500);
