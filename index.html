@@ -87,12 +87,15 @@ html,body{
 .bank-tab{padding:2px 10px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--text3);font-family:var(--mono);font-size:8px;letter-spacing:.1em;cursor:pointer;transition:all .15s}
 .bank-tab.active{border-color:var(--accent2);background:rgba(138,54,236,0.15);color:var(--accent2)}
 .strips{
-  display:flex;overflow-x:scroll;background:transparent;flex:1;align-items:stretch;
+  display:flex;overflow-x:hidden;background:transparent;flex:1;align-items:stretch;
+}
+.strips.scrollable{
+  overflow-x:scroll;
   scroll-behavior:smooth;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:none;
 }
-.strips::-webkit-scrollbar{display:none;}
+.strips.scrollable::-webkit-scrollbar{display:none;}
 
 /* Kanaalstrip */
 .strip{
@@ -584,9 +587,13 @@ function initDividerKnobs(){
 function renderStrips(){
   var c=document.getElementById('strips');c.innerHTML='';
   var chs=getBankChs();
-  var N=Math.max(chs.length,1);
-  // Toon exact aantal actieve kanalen (min 1), geen lege strips als er echte zijn
   var showN=chs.length>0?chs.length:10;
+  // Scroll alleen bij meer dan 10 kanalen
+  if(showN>10){
+    c.classList.add('scrollable');
+  } else {
+    c.classList.remove('scrollable');
+  }
   for(var i=0;i<showN;i++){
     if(i<chs.length){
       c.appendChild(mkStrip(chs[i]));
