@@ -130,7 +130,7 @@ html,body{
 
 /* Geïntegreerde fader+VU */
 .fvu{position:relative;cursor:pointer;touch-action:none;width:100%;flex:1;min-height:80px}
-.fvu-segs{position:absolute;left:50%;top:4px;bottom:4px;transform:translateX(-50%);width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none}
+.fvu-segs{position:absolute;left:50%;top:4px;bottom:4px;transform:translateX(-50%);width:10px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none}
 .fvu-seg{flex:1;border-radius:1px;background:rgba(255,255,255,0.04);transition:background 40ms}
 .fvu-thumb{
   position:absolute;left:50%;
@@ -667,13 +667,13 @@ function buildMasterFader(){
   // L VU — links van midden
   var segsL=document.createElement('div');
   segsL.id='sg-ml';
-  segsL.style.cssText='position:absolute;left:50%;margin-left:-7px;top:4px;bottom:4px;width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
+  segsL.style.cssText='position:absolute;left:50%;margin-left:-12px;top:4px;bottom:4px;width:10px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
   for(var i=0;i<SEGS;i++){var s=document.createElement('div');s.className='fvu-seg';segsL.appendChild(s);}
 
   // R VU — rechts van midden
   var segsR=document.createElement('div');
   segsR.id='sg-mr';
-  segsR.style.cssText='position:absolute;left:50%;margin-left:2px;top:4px;bottom:4px;width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
+  segsR.style.cssText='position:absolute;left:50%;margin-left:2px;top:4px;bottom:4px;width:10px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
   for(var i=0;i<SEGS;i++){var s=document.createElement('div');s.className='fvu-seg';segsR.appendChild(s);}
 
   // Thumb over L+R heen
