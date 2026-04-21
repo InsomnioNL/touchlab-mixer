@@ -313,14 +313,14 @@ html,body{
     <!-- Master strip: alleen volume fader -->
     <div class="master-strip" id="master-strip">
       <div class="master-lbl">MASTER</div>
-      <div id="master-fader" style="flex:1;width:100%;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden"></div>
+      <div id="master-fader" style="flex:1;width:100%;display:flex;align-items:stretch;justify-content:center;gap:2px;min-height:0;overflow:hidden"></div>
     </div>
 
   </div>
 </div>
 
 <script>
-var channels=[],master={vol:.8,pan:.5,fxReturn:0},masterVu=-60;
+var channels=[],master={vol:.8,pan:.5,fxReturn:0},masterVu=-60,masterVuL=-60,masterVuR=-60;
 var ws=null,rt=null,currentBank='a',sessionName='default';
 
 // ── LocalStorage helpers ──────────────────────────────────────────────────
@@ -539,7 +539,9 @@ function updSG(id,db){
 }
 function updateVUs(){
   channels.forEach(c=>updSG(c.index,c.mute?-60:c.vu));
+  updSG('ml',dbP(masterVuL||masterVu)/100*60-60);
   updSG('m',masterVu);
+  updSG('mr',dbP(masterVuR||masterVu)/100*60-60);
 }
 
 // ── Knob ───────────────────────────────────────────────────────────────────
@@ -657,7 +659,16 @@ function buildMasterFader(){
   var mc=document.getElementById('master-fader');mc.innerHTML='';
   var ms=document.getElementById('master-strip');
   var H=ms?Math.max(160,ms.offsetHeight-30):240;
-  mc.appendChild(mkFVU('m',master.vol,H,false,v=>{master.vol=v;send({type:'masterVol',value:v});saveMaster();}));
+  // L VU (no interact)
+  var vl=mkFVU('ml',dbP(masterVuL||masterVu)/100,H,true,null);
+  vl.style.width='8px';vl.style.flex='0 0 8px';
+  // Fader
+  var fdr=mkFVU('m',master.vol,H,false,v=>{master.vol=v;send({type:'masterVol',value:v});saveMaster();});
+  fdr.style.flex='1';
+  // R VU (no interact)
+  var vr=mkFVU('mr',dbP(masterVuR||masterVu)/100,H,true,null);
+  vr.style.width='8px';vr.style.flex='0 0 8px';
+  mc.appendChild(vl);mc.appendChild(fdr);mc.appendChild(vr);
 }
 
 // ── Divider knobs init ─────────────────────────────────────────────────────
@@ -748,6 +759,8 @@ setTimeout(()=>{
         ch.vu=-10-Math.abs(Math.sin(vuPhase[i])*35)-Math.random()*8;
       });
       masterVu=-8-Math.abs(Math.sin(vuPhase[0]*0.7)*25)-Math.random()*5;
+      masterVuL=masterVu+Math.random()*2-1;
+      masterVuR=masterVu+Math.random()*2-1;
       updateVUs();
     },50);
   }
