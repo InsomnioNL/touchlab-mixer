@@ -386,6 +386,8 @@ function setStatus(live){
   document.getElementById('ws-url').className='ws-input'+(live?' connected':'');
   var fe=document.getElementById('fp-edit');if(fe)fe.className='fp-edit'+(live?' live':'');
   var fl=document.getElementById('fp-live');if(fl)fl.className='fp-live'+(live?' live':'');
+  var sn=document.getElementById('session-name');
+  if(sn) sn.textContent=live&&sessionName&&sessionName!=='default'?sessionName:'';
 }
 
 // ── Edit ↔ Live ─────────────────────────────────────────────────────────────
