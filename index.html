@@ -313,7 +313,7 @@ html,body{
     <!-- Master strip: alleen volume fader -->
     <div class="master-strip" id="master-strip">
       <div class="master-lbl">MASTER</div>
-      <div id="master-fader" style="flex:1;width:100%;display:flex;align-items:stretch;justify-content:center;gap:2px;min-height:0;overflow:hidden"></div>
+      <div id="master-fader" style="flex:1;width:100%;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden"></div>
     </div>
 
   </div>
@@ -659,16 +659,44 @@ function buildMasterFader(){
   var mc=document.getElementById('master-fader');mc.innerHTML='';
   var ms=document.getElementById('master-strip');
   var H=ms?Math.max(160,ms.offsetHeight-30):240;
-  // L VU (no interact)
-  var vl=mkFVU('ml',dbP(masterVuL||masterVu)/100,H,true,null);
-  vl.style.width='8px';vl.style.flex='0 0 8px';
-  // Fader
-  var fdr=mkFVU('m',master.vol,H,false,v=>{master.vol=v;send({type:'masterVol',value:v});saveMaster();});
-  fdr.style.flex='1';
-  // R VU (no interact)
-  var vr=mkFVU('mr',dbP(masterVuR||masterVu)/100,H,true,null);
-  vr.style.width='8px';vr.style.flex='0 0 8px';
-  mc.appendChild(vl);mc.appendChild(fdr);mc.appendChild(vr);
+  var R=H-PAD*2-13;
+
+  // Container met L VU + fader + R VU
+  var wrap=document.createElement('div');
+  wrap.style.cssText='position:relative;width:100%;height:'+H+'px;display:flex;align-items:stretch;gap:2px;';
+
+  // L VU — smal, links
+  var segsL=document.createElement('div');
+  segsL.id='sg-ml';
+  segsL.style.cssText='position:absolute;left:0;top:4px;bottom:4px;width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
+  for(var i=0;i<SEGS;i++){var s=document.createElement('div');s.className='fvu-seg';segsL.appendChild(s);}
+
+  // R VU — smal, rechts
+  var segsR=document.createElement('div');
+  segsR.id='sg-mr';
+  segsR.style.cssText='position:absolute;right:0;top:4px;bottom:4px;width:5px;display:flex;flex-direction:column-reverse;gap:1px;pointer-events:none;';
+  for(var i=0;i<SEGS;i++){var s=document.createElement('div');s.className='fvu-seg';segsR.appendChild(s);}
+
+  // Fader thumb
+  var thumb=document.createElement('div');thumb.className='fvu-thumb';thumb.id='th-m';
+  var line=document.createElement('div');line.className='fvu-line';thumb.appendChild(line);
+  thumb.style.top=((1-master.vol)*R+PAD+6.5)+'px';
+
+  wrap.appendChild(segsL);
+  wrap.appendChild(segsR);
+  wrap.appendChild(thumb);
+  mc.appendChild(wrap);
+
+  // Drag
+  var drag=false,sy=0,sv=master.vol;
+  function dn(y){drag=true;sy=y;sv=1-(parseFloat(thumb.style.top)-PAD-6.5)/R;}
+  function mv(y){if(!drag)return;var v=Math.max(0,Math.min(1,sv+(sy-y)/R));thumb.style.top=((1-v)*R+PAD+6.5)+'px';master.vol=v;send({type:'masterVol',value:v});saveMaster();}
+  wrap.addEventListener('mousedown',e=>{dn(e.clientY);e.preventDefault();});
+  wrap.addEventListener('touchstart',e=>{dn(e.touches[0].clientY);e.preventDefault();},{passive:false});
+  window.addEventListener('mousemove',e=>mv(e.clientY));
+  window.addEventListener('touchmove',e=>{if(drag){mv(e.touches[0].clientY);e.preventDefault();}},{passive:false});
+  window.addEventListener('mouseup',()=>drag=false);
+  window.addEventListener('touchend',()=>drag=false);
 }
 
 // ── Divider knobs init ─────────────────────────────────────────────────────
