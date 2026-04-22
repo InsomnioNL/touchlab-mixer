@@ -904,6 +904,19 @@ function showKnobPopup(el,type,val,cb){
     updatePopupVal(v,type);
     if(popupCb)popupCb(v);
   };
+  // Dblclick/dubbeltap op waarde → reset
+  var valEl=document.getElementById('popup-val');
+  valEl.ondblclick=function(){
+    var def=type==='pan'?50:0;
+    fader.value=def;var v=def/100;
+    updatePopupVal(v,type);if(popupCb)popupCb(v);
+  };
+  var pvLastTap=0;
+  valEl.ontouchend=function(e){
+    var now=Date.now();
+    if(now-pvLastTap<350){valEl.ondblclick();e.preventDefault();}
+    pvLastTap=now;
+  };
   // Dubbeltap op popup fader → reset
   var popLastTap=0;
   fader.addEventListener('touchend',function(e){
@@ -946,10 +959,12 @@ function hideKnobPopup(){
 // Tik buiten knob sluit popup
 document.addEventListener('click',function(e){
   var popup=document.getElementById('knob-popup');
-  if(!popup.classList.contains('hidden')&&!popup.contains(e.target)&&e.target!==popupTarget){
-    hideKnobPopup();
-  }
+  if(popup.classList.contains('hidden'))return;
+  // Klik buiten popup → sluit
+  if(!popup.contains(e.target)){hideKnobPopup();return;}
 });
+
+// popup-val dblclick reset wordt ingesteld in showKnobPopup
 
 // Override initK click voor channel knobs — open popup bij single click
 function attachPopup(el,type,getCb,setCb){
@@ -981,11 +996,6 @@ function attachPopup(el,type,getCb,setCb){
   overlay.addEventListener('touchend',function(e){
     if(tMoved)return;
     e.preventDefault();
-    // Sluit popup als die open is, open anders nieuwe
-    var popup=document.getElementById('knob-popup');
-    if(!popup.classList.contains('hidden')&&popupTarget!==el){
-      hideKnobPopup();return;
-    }
     openPopup(e);
   },{passive:false});
 }
@@ -1019,7 +1029,7 @@ window.addEventListener('orientationchange',function(){setTimeout(scaleSplashLog
 <div class="knob-popup hidden" id="knob-popup">
   <div class="knob-popup-label" id="popup-label">PAN</div>
   <input type="range" id="popup-fader" min="0" max="100" value="50" step="1">
-  <div class="knob-popup-val" id="popup-val">C</div>
+  <div class="knob-popup-val" id="popup-val" title="dubbelklik = reset">C</div>
 </div>
 </body>
 </html>
