@@ -1027,7 +1027,10 @@ window.addEventListener('orientationchange',function(){setTimeout(scaleSplashLog
 
 <!-- Knob popup -->
 <div class="knob-popup hidden" id="knob-popup">
-  <div class="knob-popup-label" id="popup-label">PAN</div>
+  <div style="display:flex;width:100%;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <div class="knob-popup-label" id="popup-label">PAN</div>
+    <button onclick="hideKnobPopup()" style="background:transparent;border:none;color:rgba(176,106,245,0.7);font-size:14px;cursor:pointer;padding:0 2px;line-height:1">&#x2715;</button>
+  </div>
   <input type="range" id="popup-fader" min="0" max="100" value="50" step="1">
   <div class="knob-popup-val" id="popup-val" title="dubbelklik = reset">C</div>
 </div>
