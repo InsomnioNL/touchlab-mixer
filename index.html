@@ -240,9 +240,9 @@ html,body{
   position:fixed;z-index:9999;
   background:rgba(15,4,35,0.96);
   border:1px solid rgba(138,54,236,0.35);
-  border-radius:8px;padding:14px 16px;
+  border-radius:8px;padding:14px 20px;
   display:flex;flex-direction:column;align-items:center;gap:8px;
-  min-width:200px;box-shadow:0 4px 24px rgba(0,0,0,0.6);
+  box-shadow:0 4px 24px rgba(0,0,0,0.6);
 }
 .knob-popup.hidden{display:none}
 .knob-popup-label{font-size:8px;letter-spacing:.12em;color:rgba(255,255,255,0.4);font-family:var(--mono)}
@@ -256,10 +256,10 @@ html,body{
 .popup-fader-v{
   -webkit-appearance:none;appearance:none;
   writing-mode:vertical-lr;direction:rtl;
-  width:14px;height:240px;background:transparent;cursor:pointer;outline:none;
+  width:24px;height:240px;background:transparent;cursor:pointer;outline:none;
 }
 .popup-fader-v::-webkit-slider-runnable-track{width:3px;background:rgba(138,54,236,0.3);border-radius:2px}
-.popup-fader-v::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:12px;background:rgba(138,54,236,0.8);border-radius:3px;margin-left:-6px}
+.popup-fader-v::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:14px;background:rgba(138,54,236,0.8);border-radius:3px;margin-left:-11px}
 </style>
 </head>
 <body>
@@ -381,7 +381,7 @@ function connect(url){
     var msg=JSON.parse(e.data);
     if(msg.type==='init'){
       sessionName=msg.session||'default';
-      channels=msg.channels.map(c=>({...c,vu:-60}));
+      channels=msg.channels.map(c=>({...c,vol:0,pan:0.5,fx:0,vu:-60}));
       channels.forEach(loadChannelMemory);
       var mm=loadMasterMemory();
       master={vol:0,pan:mm?mm.pan:0.5,fxReturn:mm?mm.fxReturn:0};
@@ -493,13 +493,20 @@ function recallChannels(){
   var btn=document.getElementById('btn-recall-ch');
   channels.forEach(function(ch){
     var m=lsLoad('ch_'+ch.index,null);
-    if(m){ch.vol=m.vol||0;ch.pan=m.pan||0.5;ch.fx=m.fx||0;ch.mute=m.mute||false;ch.solo=m.solo||false;
+    if(m){
+      ch.vol=m.vol!==undefined?m.vol:0;
+      ch.pan=m.pan!==undefined?m.pan:0.5;
+      ch.fx=m.fx!==undefined?m.fx:0;
+      ch.mute=m.mute||false;
+      ch.solo=m.solo||false;
       send({type:'volume',channel:ch.index,value:ch.vol});
       send({type:'pan',channel:ch.index,value:ch.pan});
+      send({type:'fx',channel:ch.index,value:ch.fx});
       send({type:'mute',channel:ch.index,value:ch.mute});
     }
   });
   renderStrips();
+  updateStripColors();
   if(btn){btn.style.background='rgba(69,230,143,0.2)';btn.style.borderColor='rgba(69,230,143,0.8)';}
 }
 function recallMaster(){
@@ -509,7 +516,7 @@ function recallMaster(){
   send({type:'masterVol',value:master.vol});
   send({type:'masterPan',value:master.pan});
   send({type:'fxReturn',value:master.fxReturn});
-  buildMasterFader();initDividerKnobs();scaleSplashLogoRAF();
+  buildMasterFader();initDividerKnobs();if(typeof scaleSplashLogoRAF==="function")scaleSplashLogoRAF();
   var btn=document.getElementById('btn-recall-m');
   if(btn){btn.style.background='rgba(240,185,58,0.2)';btn.style.borderColor='rgba(240,185,58,0.8)';}
 }
@@ -820,7 +827,7 @@ function renderAll(){
 setTimeout(()=>{
   if(channels.length===0){
     var names=['Bas','Piano','Gitaar','Zang','Viool','Cello','Fluit','Hobo','Hoorn','Perc'];
-    channels=names.map((n,i)=>({index:i+1,name:n,vol:.75,pan:.5,fx:0,mute:false,solo:false,vu:-35}));
+    channels=names.map((n,i)=>({index:i+1,name:n,vol:0,pan:0.5,fx:0,mute:false,solo:false,vu:-60}));
     master={vol:0,pan:.5,fxReturn:0};
     renderAll();
 
@@ -866,7 +873,7 @@ function showKnobPopup(el,type,val,cb){
     updatePopupVal(val,type);
   } else {
     fader.className='popup-fader-v';
-    fader.style.cssText='writing-mode:vertical-lr;direction:rtl;width:14px;height:240px';
+    fader.style.cssText='writing-mode:vertical-lr;direction:rtl;width:24px;height:240px';
     fader.value=Math.round(val*100);
     updatePopupVal(val,type);
   }
@@ -913,7 +920,6 @@ document.addEventListener('click',function(e){
 
 // Override initK click voor channel knobs — open popup bij single click
 function attachPopup(el,type,getCb,setCb){
-  // Grote touch area direct op de knob zelf
   function openPopup(e){
     e.stopPropagation();
     var val=parseFloat(el.dataset.currentVal||el.dataset.default||'0.5');
@@ -922,14 +928,13 @@ function attachPopup(el,type,getCb,setCb){
       setCb(v);
     });
   }
-  el.addEventListener('click',openPopup);
-  el.addEventListener('touchend',function(e){
-    e.preventDefault();
-    openPopup(e);
-  },{passive:false});
-  // Vergroot het touch target via style
-  el.style.padding='10px';
-  el.style.margin='-10px';
+  // Transparante overlay als touch target — raakt layout niet aan
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:absolute;top:-10px;left:-10px;right:-10px;bottom:-10px;z-index:2;cursor:pointer;';
+  el.style.position='relative';
+  el.appendChild(overlay);
+  overlay.addEventListener('click',openPopup);
+  overlay.addEventListener('touchend',function(e){e.preventDefault();openPopup(e);},{passive:false});
 }
 
 </script>
