@@ -610,8 +610,13 @@ function initK(el,val,size,cb,color){
   var lastTap=0;
   var def=el.dataset.default!==undefined?parseFloat(el.dataset.default):0;
   function resetK(e){e.preventDefault();e.stopPropagation();val=def;setKL(ln,val,size);if(cb)cb(val);}
-  el.addEventListener('dblclick',resetK);
-  el.addEventListener('touchend',function(e){var now=Date.now();if(now-lastTap<300)resetK(e);lastTap=now;});
+  el.addEventListener('dblclick',function(e){e.stopPropagation();resetK(e);});
+  el.addEventListener('touchend',function(e){
+    if(drag)return;
+    var now=Date.now();
+    if(now-lastTap<350){e.preventDefault();e.stopPropagation();resetK(e);}
+    lastTap=now;
+  });
 }
 function setKL(ln,v,size){
   var a=(-135+v*270)*Math.PI/180,cx=size/2,r=size*.33;
@@ -935,13 +940,28 @@ function attachPopup(el,type,getCb,setCb){
       setCb(v);
     });
   }
-  // Transparante overlay als touch target — raakt layout niet aan
   var overlay=document.createElement('div');
   overlay.style.cssText='position:absolute;top:-10px;left:-10px;right:-10px;bottom:-10px;z-index:2;cursor:pointer;';
   el.style.position='relative';
   el.appendChild(overlay);
-  overlay.addEventListener('click',openPopup);
-  overlay.addEventListener('touchend',function(e){e.preventDefault();openPopup(e);},{passive:false});
+  // Desktop: klik opent popup
+  overlay.addEventListener('click',function(e){
+    if(el.dataset.wasDragged==='1'){el.dataset.wasDragged='0';return;}
+    openPopup(e);
+  });
+  // Mobiel: touchstart → touchend zonder beweging opent popup
+  var tStartX,tStartY,tMoved;
+  overlay.addEventListener('touchstart',function(e){
+    tStartX=e.touches[0].clientX;tStartY=e.touches[0].clientY;tMoved=false;
+  },{passive:true});
+  overlay.addEventListener('touchmove',function(e){
+    if(Math.abs(e.touches[0].clientX-tStartX)>8||Math.abs(e.touches[0].clientY-tStartY)>8) tMoved=true;
+  },{passive:true});
+  overlay.addEventListener('touchend',function(e){
+    if(tMoved)return;
+    e.preventDefault();
+    openPopup(e);
+  },{passive:false});
 }
 
 
