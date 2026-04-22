@@ -90,6 +90,11 @@ html,body{
 .strips{
   display:flex;overflow-x:hidden;background:transparent;flex:1;align-items:stretch;
 }
+.strip-scroll-zone{
+  height:20px;width:100%;flex-shrink:0;
+  touch-action:pan-x;
+  cursor:grab;
+}
 .strips.scrollable{
   overflow-x:scroll;
   scroll-behavior:smooth;
@@ -145,6 +150,8 @@ html,body{
   box-shadow:0 1px 4px rgba(0,0,0,.7);z-index:2;
 }
 .fvu-line{width:60%;height:1px;background:rgba(190,190,210,.42);border-radius:1px}
+.fvu-digit{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:rgba(176,106,245,0.85);font-family:var(--mono);white-space:nowrap;pointer-events:none;letter-spacing:.04em}
+
 
 /* Knob */
 .knob{
@@ -553,9 +560,10 @@ function mkFVU(id,val,H,noint,cb){
   for(var i=0;i<SEGS;i++){var s=document.createElement('div');s.className='fvu-seg';segs.appendChild(s)}
   var thumb=document.createElement('div');thumb.className='fvu-thumb';thumb.id='th-'+id;
   var line=document.createElement('div');line.className='fvu-line';thumb.appendChild(line);
+  if(!noint){var digit=document.createElement('div');digit.className='fvu-digit';digit.id='dig-'+id;digit.textContent=Math.round(val*100)+'%';thumb.appendChild(digit);}
   wrap.appendChild(segs);wrap.appendChild(thumb);
   function getR(){var h=wrap.clientHeight||parseInt(wrap.style.height)||200;return h-PAD*2-13}
-  function setThumb(v){var R=getR();thumb.style.top=((1-v)*R+PAD+6.5)+'px';}
+  function setThumb(v){var R=getR();thumb.style.top=((1-v)*R+PAD+6.5)+'px';var d=document.getElementById('dig-'+id);if(d){d.textContent=Math.round(v*100)+'%';d.style.top=v>0.85?'18px':'-16px';}}
   requestAnimationFrame(()=>requestAnimationFrame(()=>setThumb(val)));
   if(noint) return wrap;
   var drag=false,sy=0,sv=val;
