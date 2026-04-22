@@ -234,6 +234,31 @@ html,body{
 .master-lbl{font-size:7px;color:var(--amber);letter-spacing:.12em;flex-shrink:0;order:10;}
 
 @keyframes fp-pulse{0%,100%{opacity:1;filter:drop-shadow(0 0 4px #45e68f)}50%{opacity:.55;filter:drop-shadow(0 0 1px #45e68f)}}
+
+.knob-popup{
+  position:fixed;z-index:9999;
+  background:rgba(15,4,35,0.96);
+  border:1px solid rgba(138,54,236,0.35);
+  border-radius:8px;padding:14px 16px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  min-width:160px;box-shadow:0 4px 24px rgba(0,0,0,0.6);
+}
+.knob-popup.hidden{display:none}
+.knob-popup-label{font-size:8px;letter-spacing:.12em;color:rgba(255,255,255,0.4);font-family:var(--mono)}
+.knob-popup-val{font-size:11px;letter-spacing:.08em;font-family:var(--mono);color:rgba(255,255,255,0.7)}
+.popup-fader-h{
+  -webkit-appearance:none;appearance:none;
+  width:140px;height:28px;background:transparent;cursor:pointer;outline:none;
+}
+.popup-fader-h::-webkit-slider-runnable-track{height:3px;background:rgba(138,54,236,0.3);border-radius:2px}
+.popup-fader-h::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:28px;background:rgba(69,230,143,0.8);border-radius:3px;margin-top:-13px}
+.popup-fader-v{
+  -webkit-appearance:none;appearance:none;
+  writing-mode:vertical-lr;direction:rtl;
+  width:28px;height:120px;background:transparent;cursor:pointer;outline:none;
+}
+.popup-fader-v::-webkit-slider-runnable-track{width:3px;background:rgba(138,54,236,0.3);border-radius:2px}
+.popup-fader-v::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:18px;background:rgba(138,54,236,0.8);border-radius:3px;margin-left:-13px}
 </style>
 </head>
 <body>
@@ -618,14 +643,24 @@ function mkStrip(ch){
   // PAN knob
   var kn=document.createElement('div');kn.className='knob';kn.id='kn-'+ch.index+'-pan';
   kn.style.width='22px';kn.style.height='22px';
-  kn.dataset.default=0.5;initK(kn,ch.pan||.5,22,v=>{ch.pan=v;send({type:'pan',channel:ch.index,value:v});saveChannel(ch);},'green');
+  kn.dataset.default=0.5;
+    (function(c,k){
+      initK(k,c.pan||.5,22,function(v){c.pan=v;k.dataset.currentVal=v;send({type:'pan',channel:c.index,value:v});saveChannel(c);},'green');
+      k.dataset.currentVal=c.pan||.5;
+      attachPopup(k,'pan',function(){return parseFloat(k.dataset.currentVal||'0.5');},function(v){c.pan=v;k.dataset.currentVal=v;var ln2=k.querySelector('line');if(ln2)setKL(ln2,v,22);send({type:'pan',channel:c.index,value:v});saveChannel(c);});
+    })(ch,kn);
   var kw=document.createElement('div');kw.className='kw';
   var kl=document.createElement('div');kl.className='kl';kl.textContent='PAN';
   kw.appendChild(kn);kw.appendChild(kl);
   // FX knob
   var fxkn=document.createElement('div');fxkn.className='knob';fxkn.id='kn-'+ch.index+'-fx';
   fxkn.style.width='20px';fxkn.style.height='20px';
-  fxkn.dataset.default=0;initK(fxkn,ch.fx||0,20,v=>{ch.fx=v;send({type:'fx',channel:ch.index,value:v});saveChannel(ch);},'purple');
+  fxkn.dataset.default=0;
+    (function(c,k){
+      initK(k,c.fx||0,20,function(v){c.fx=v;k.dataset.currentVal=v;send({type:'fx',channel:c.index,value:v});saveChannel(c);},'purple');
+      k.dataset.currentVal=c.fx||0;
+      attachPopup(k,'fx',function(){return parseFloat(k.dataset.currentVal||'0');},function(v){c.fx=v;k.dataset.currentVal=v;var ln2=k.querySelector('line');if(ln2)setKL(ln2,v,20);send({type:'fx',channel:c.index,value:v});saveChannel(c);});
+    })(ch,fxkn);
   var fxkw=document.createElement('div');fxkw.className='kw';
   var fxkl=document.createElement('div');fxkl.className='kl';fxkl.textContent='FX';
   fxkw.appendChild(fxkn);fxkw.appendChild(fxkl);
@@ -706,9 +741,13 @@ function buildMasterFader(){
 // ── Divider knobs init ─────────────────────────────────────────────────────
 function initDividerKnobs(){
   var mpk=document.getElementById('kn-m-pan');
-  if(mpk&&!mpk.querySelector('svg')) mpk.dataset.default=0.5;initK(mpk,master.pan||.5,26,v=>{master.pan=v;send({type:'masterPan',value:v});saveMaster();},'amber');
+  if(mpk&&!mpk.querySelector('svg')) mpk.dataset.default=0.5;mpk.dataset.currentVal=master.pan||.5;
+    initK(mpk,master.pan||.5,26,function(v){master.pan=v;mpk.dataset.currentVal=v;send({type:'masterPan',value:v});saveMaster();},'green');
+    attachPopup(mpk,'pan',function(){return parseFloat(mpk.dataset.currentVal||'0.5');},function(v){master.pan=v;mpk.dataset.currentVal=v;var ln2=mpk.querySelector('line');if(ln2)setKL(ln2,v,26);send({type:'masterPan',value:v});saveMaster();});
   var mfx=document.getElementById('kn-m-fx');
-  if(mfx&&!mfx.querySelector('svg')) mfx.dataset.default=0;initK(mfx,master.fxReturn||0,26,v=>{master.fxReturn=v;send({type:'fxReturn',value:v});saveMaster();},'amber');
+  if(mfx&&!mfx.querySelector('svg')) mfx.dataset.default=0;mfx.dataset.currentVal=master.fxReturn||0;
+    initK(mfx,master.fxReturn||0,26,function(v){master.fxReturn=v;mfx.dataset.currentVal=v;send({type:'fxReturn',value:v});saveMaster();},'purple');
+    attachPopup(mfx,'fx',function(){return parseFloat(mfx.dataset.currentVal||'0');},function(v){master.fxReturn=v;mfx.dataset.currentVal=v;var ln2=mfx.querySelector('line');if(ln2)setKL(ln2,v,26);send({type:'fxReturn',value:v});saveMaster();});
   // Mute button master
   var mmb=document.getElementById('btn-m-mute');
   if(!mmb){
@@ -805,6 +844,91 @@ setTimeout(function(){
 },50);
 
 connect('ws://localhost:8080');
+
+// ── Knob popup ─────────────────────────────────────────────────────────────
+var popupTarget=null,popupCb=null,popupType=null;
+
+function showKnobPopup(el,type,val,cb){
+  var popup=document.getElementById('knob-popup');
+  var fader=document.getElementById('popup-fader');
+  var label=document.getElementById('popup-label');
+  var valEl=document.getElementById('popup-val');
+  popupTarget=el;popupCb=cb;popupType=type;
+
+  label.textContent=type==='pan'?'PAN':'FX';
+  label.style.color=type==='pan'?'rgba(69,230,143,0.7)':'rgba(138,54,236,0.7)';
+
+  if(type==='pan'){
+    fader.className='popup-fader-h';
+    fader.style.cssText='width:140px;height:28px;writing-mode:initial;direction:initial';
+    fader.value=Math.round(val*100);
+    updatePopupVal(val,type);
+  } else {
+    fader.className='popup-fader-v';
+    fader.style.cssText='writing-mode:vertical-lr;direction:rtl;width:28px;height:120px';
+    fader.value=Math.round(val*100);
+    updatePopupVal(val,type);
+  }
+
+  // Positie naast knob
+  var r=el.getBoundingClientRect();
+  popup.classList.remove('hidden');
+  var pw=popup.offsetWidth,ph=popup.offsetHeight;
+  var left=Math.min(r.left,window.innerWidth-pw-8);
+  var top=Math.max(8,r.top-ph-8);
+  popup.style.left=left+'px';
+  popup.style.top=top+'px';
+
+  fader.oninput=function(){
+    var v=parseInt(fader.value)/100;
+    updatePopupVal(v,type);
+    if(popupCb)popupCb(v);
+  };
+}
+
+function updatePopupVal(v,type){
+  var el=document.getElementById('popup-val');
+  if(type==='pan'){
+    var pct=Math.round((v-.5)*200);
+    el.style.color='rgba(69,230,143,0.7)';
+    el.textContent=pct===0?'C':pct>0?'R'+pct:'L'+Math.abs(pct);
+  } else {
+    el.style.color='rgba(138,54,236,0.7)';
+    el.textContent=Math.round(v*100)+'%';
+  }
+}
+
+function hideKnobPopup(){
+  document.getElementById('knob-popup').classList.add('hidden');
+  popupTarget=null;
+}
+
+document.addEventListener('click',function(e){
+  var popup=document.getElementById('knob-popup');
+  if(!popup.classList.contains('hidden')&&!popup.contains(e.target)&&e.target!==popupTarget){
+    hideKnobPopup();
+  }
+});
+
+// Override initK click voor channel knobs — open popup bij single click
+function attachPopup(el,type,getCb,setCb){
+  el.addEventListener('click',function(e){
+    e.stopPropagation();
+    var val=parseFloat(el.dataset.currentVal||el.dataset.default||'0.5');
+    showKnobPopup(el,type,val,function(v){
+      el.dataset.currentVal=v;
+      setCb(v);
+    });
+  });
+}
+
 </script>
+
+<!-- Knob popup -->
+<div class="knob-popup hidden" id="knob-popup">
+  <div class="knob-popup-label" id="popup-label">PAN</div>
+  <input type="range" id="popup-fader" min="0" max="100" value="50" step="1">
+  <div class="knob-popup-val" id="popup-val">C</div>
+</div>
 </body>
 </html>
