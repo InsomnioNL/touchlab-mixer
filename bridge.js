@@ -179,6 +179,7 @@ wss.on("connection", ws => {
       mute: state[ch.index].mute, solo: state[ch.index].solo, fx: state[ch.index].fx,
     })),
     master: { vol: masterVol, hp: hpVol, fxReturn },
+    ttb: cfg.ttb || null,
   }));
   ws.on("message", raw => { try { handleFrontendMessage(JSON.parse(raw)); } catch {} });
   ws.on("close", () => { wsClients.delete(ws); console.log(`-  Frontend verbroken (${wsClients.size} clients)`); });
