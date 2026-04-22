@@ -987,6 +987,7 @@ function attachPopup(el,type,getCb,setCb){
   });
   // Mobiel: touchstart → touchend zonder beweging opent popup
   var tStartX,tStartY,tMoved;
+  var oLastTap=0;
   overlay.addEventListener('touchstart',function(e){
     tStartX=e.touches[0].clientX;tStartY=e.touches[0].clientY;tMoved=false;
   },{passive:true});
@@ -996,6 +997,17 @@ function attachPopup(el,type,getCb,setCb){
   overlay.addEventListener('touchend',function(e){
     if(tMoved)return;
     e.preventDefault();
+    var now=Date.now();
+    if(now-oLastTap<350){
+      // Dubbeltap → reset naar default
+      var def=parseFloat(el.dataset.default||'0');
+      el.dataset.currentVal=def;
+      var ln2=el.querySelector('line');
+      if(ln2)setKL(ln2,def,parseInt(el.style.width)||22);
+      setCb(def);
+      oLastTap=0;return;
+    }
+    oLastTap=now;
     openPopup(e);
   },{passive:false});
 }
