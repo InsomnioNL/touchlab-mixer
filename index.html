@@ -562,6 +562,12 @@ function initK(el,val,size,cb,color){
   window.addEventListener('mousemove',e=>{if(!drag)return;val=Math.max(0,Math.min(1,sv+(sy-e.clientY)/120));setKL(ln,val,size);if(cb)cb(val)});
   window.addEventListener('touchmove',e=>{if(!drag)return;val=Math.max(0,Math.min(1,sv+(sy-e.touches[0].clientY)/120));setKL(ln,val,size);if(cb)cb(val)},{passive:false});
   window.addEventListener('mouseup',()=>drag=false);window.addEventListener('touchend',()=>drag=false);
+  // Dubbeltap/dubbelklik → reset naar default
+  var lastTap=0;
+  var def=el.dataset.default!==undefined?parseFloat(el.dataset.default):0;
+  function resetK(e){e.preventDefault();e.stopPropagation();val=def;setKL(ln,val,size);if(cb)cb(val);}
+  el.addEventListener('dblclick',resetK);
+  el.addEventListener('touchend',function(e){var now=Date.now();if(now-lastTap<300)resetK(e);lastTap=now;});
 }
 function setKL(ln,v,size){
   var a=(-135+v*270)*Math.PI/180,cx=size/2,r=size*.33;
