@@ -904,6 +904,26 @@ function showKnobPopup(el,type,val,cb){
     updatePopupVal(v,type);
     if(popupCb)popupCb(v);
   };
+  // Dubbeltap op popup fader → reset
+  var popLastTap=0;
+  fader.addEventListener('touchend',function(e){
+    var now=Date.now();
+    if(now-popLastTap<350){
+      var def=type==='pan'?50:0;
+      fader.value=def;
+      var v=def/100;
+      updatePopupVal(v,type);
+      if(popupCb)popupCb(v);
+    }
+    popLastTap=now;
+  });
+  fader.addEventListener('dblclick',function(){
+    var def=type==='pan'?50:0;
+    fader.value=def;
+    var v=def/100;
+    updatePopupVal(v,type);
+    if(popupCb)popupCb(v);
+  });
 }
 
 function updatePopupVal(v,type){
@@ -923,6 +943,7 @@ function hideKnobPopup(){
   popupTarget=null;
 }
 
+// Tik buiten knob sluit popup
 document.addEventListener('click',function(e){
   var popup=document.getElementById('knob-popup');
   if(!popup.classList.contains('hidden')&&!popup.contains(e.target)&&e.target!==popupTarget){
@@ -955,11 +976,16 @@ function attachPopup(el,type,getCb,setCb){
     tStartX=e.touches[0].clientX;tStartY=e.touches[0].clientY;tMoved=false;
   },{passive:true});
   overlay.addEventListener('touchmove',function(e){
-    if(Math.abs(e.touches[0].clientX-tStartX)>8||Math.abs(e.touches[0].clientY-tStartY)>8) tMoved=true;
+    if(Math.abs(e.touches[0].clientX-tStartX)>6||Math.abs(e.touches[0].clientY-tStartY)>6) tMoved=true;
   },{passive:true});
   overlay.addEventListener('touchend',function(e){
     if(tMoved)return;
     e.preventDefault();
+    // Sluit popup als die open is, open anders nieuwe
+    var popup=document.getElementById('knob-popup');
+    if(!popup.classList.contains('hidden')&&popupTarget!==el){
+      hideKnobPopup();return;
+    }
     openPopup(e);
   },{passive:false});
 }
