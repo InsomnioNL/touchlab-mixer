@@ -11,8 +11,20 @@ Start:
 """
 import json, sys, os
 
-def write_channel(idx, name):
-    """Genereert ch1.pd, ch2.pd etc. — geen $1, alles hardcoded."""
+def write_channel(idx, name, with_sampler_tap=False):
+    """Genereert ch1.pd, ch2.pd etc. — geen $1, alles hardcoded.
+
+    Als with_sampler_tap=True, voegt send~ sampler-src-chN toe (post-fader,
+    post-gate, pre-fx, pre-pan) voor de sampler-module.
+    """
+    # Base pattern: 30 objects (indices 0-29). Sampler tap wordt object 30.
+    sampler_tap_line = ""
+    sampler_tap_connect = ""
+    if with_sampler_tap:
+        sampler_tap_line = f"#X obj 400 240 send~ sampler-src-ch{idx};\n"
+        # Object 30 (the send~) gets signal from object 8 (post-gate *~)
+        sampler_tap_connect = "#X connect 8 0 30 0;\n"
+
     content = f"""\
 #N canvas 0 0 450 520 12;
 #X obj 10 20 catch~ ch{idx};
@@ -45,7 +57,7 @@ def write_channel(idx, name):
 #X obj 170 460 s ch{idx}-gate;
 #X msg 250 440 0;
 #X obj 250 460 s ch{idx}-fx;
-#X connect 0 0 4 0;
+{sampler_tap_line}#X connect 0 0 4 0;
 #X connect 1 0 2 0;
 #X connect 2 0 3 0;
 #X connect 3 0 4 1;
@@ -73,11 +85,12 @@ def write_channel(idx, name):
 #X connect 24 0 25 0;
 #X connect 26 0 27 0;
 #X connect 28 0 29 0;
-"""
+{sampler_tap_connect}"""
     fname = f"ch{idx}.pd"
     with open(fname, "w") as f:
         f.write(content)
-    print(f"  ✓  {fname}  ({name})")
+    tag = " +sampler-tap" if with_sampler_tap else ""
+    print(f"  ✓  {fname}  ({name}){tag}")
 
 
 def write_fx_bus():
@@ -112,8 +125,55 @@ def write_fx_bus():
     print("  ✓  fx-bus.pd")
 
 
-def write_master():
-    content = """\
+def write_master(with_sampler_tap=False):
+    """
+    Master section.
+
+    VU fix: env~ has only one signal inlet, but the old version tried to
+    connect both L and R to it (resulting in a 'connection failed' warning
+    at load and an L-only VU in practice).  Here we sum L+R via [+~] and
+    halve via [*~ 0.5] before env~, giving a proper stereo-sum VU that
+    reads 0 dB for mono content and averages for uncorrelated stereo.
+
+    Object map:
+        0-21 : base (catch~, *~, env~, dac~, hp chain, loadbang defaults)
+        22-23: VU stereo-sum (+~  and  *~ 0.5) — always present
+        24-27: sampler-tap chain (0.5×L, 0.5×R, +~, send~) — if enabled
+    """
+    # VU stereo-sum — always added, replaces the buggy direct-to-env~ wiring.
+    vu_sum_lines = (
+        "#X obj 130 150 +~;\n"          # obj 22: L + R
+        "#X obj 130 170 *~ 0.5;\n"      # obj 23: halve so mono = 0 dB VU
+    )
+    vu_sum_connects = (
+        "#X connect 5 0 22 0;\n"        # *~ L → sum inlet 0
+        "#X connect 6 0 22 1;\n"        # *~ R → sum inlet 1
+        "#X connect 22 0 23 0;\n"       # sum → halve
+        "#X connect 23 0 7 0;\n"        # halve → env~
+    )
+
+    sampler_tap_lines = ""
+    sampler_tap_connects = ""
+    if with_sampler_tap:
+        # Sampler tap now lives at indices 24-27 (VU-sum took 22-23).
+        sampler_tap_lines = (
+            "#X obj 120 200 *~ 0.5;\n"          # obj 24
+            "#X obj 190 200 *~ 0.5;\n"          # obj 25
+            "#X obj 120 230 +~;\n"              # obj 26
+            "#X obj 120 260 send~ sampler-src-master;\n"  # obj 27
+        )
+        sampler_tap_connects = (
+            "#X connect 5 0 24 0;\n"
+            "#X connect 6 0 25 0;\n"
+            "#X connect 24 0 26 0;\n"
+            "#X connect 25 0 26 1;\n"
+            "#X connect 26 0 27 0;\n"
+        )
+
+    # NOTE: the old buggy connects "#X connect 5 0 7 0" and
+    # "#X connect 6 0 7 1" are removed — env~ now gets its input from
+    # the VU-sum chain (obj 23).
+    content = f"""\
 #N canvas 0 0 400 400 12;
 #X obj 10 20 catch~ masterL;
 #X obj 80 20 catch~ masterR;
@@ -122,31 +182,29 @@ def write_master():
 #X obj 10 100 line~;
 #X obj 10 130 *~;
 #X obj 80 130 *~;
-#X obj 10 170 env~;
-#X obj 10 190 - 100;
-#X obj 10 210 s masterVu;
-#X obj 10 240 dac~ 1 2;
+#X obj 10 190 env~;
+#X obj 10 210 - 100;
+#X obj 10 230 s masterVu;
+#X obj 10 270 dac~ 1 2;
 #X obj 220 60 r hpVol;
 #X obj 220 80 pack f 10;
 #X obj 220 100 line~;
 #X obj 220 130 *~;
 #X obj 290 130 *~;
-#X obj 220 240 dac~ 3 4;
-#X obj 10 310 loadbang;
-#X msg 10 330 0.8;
-#X obj 10 350 s masterVol;
-#X msg 90 330 0.8;
-#X obj 90 350 s hpVol;
-#X connect 0 0 5 0;
+#X obj 220 270 dac~ 3 4;
+#X obj 10 340 loadbang;
+#X msg 10 360 0.8;
+#X obj 10 380 s masterVol;
+#X msg 90 360 0.8;
+#X obj 90 380 s hpVol;
+{vu_sum_lines}{sampler_tap_lines}#X connect 0 0 5 0;
 #X connect 1 0 6 0;
 #X connect 2 0 3 0;
 #X connect 3 0 4 0;
 #X connect 4 0 5 1;
 #X connect 4 0 6 1;
-#X connect 5 0 7 0;
 #X connect 5 0 10 0;
 #X connect 5 0 14 0;
-#X connect 6 0 7 1;
 #X connect 6 0 10 1;
 #X connect 6 0 15 0;
 #X connect 7 0 8 0;
@@ -161,10 +219,11 @@ def write_master():
 #X connect 17 0 20 0;
 #X connect 18 0 19 0;
 #X connect 20 0 21 0;
-"""
+{vu_sum_connects}{sampler_tap_connects}"""
     with open("master-section.pd", "w") as f:
         f.write(content)
-    print("  ✓  master-section.pd")
+    tag = " +sampler-tap" if with_sampler_tap else ""
+    print(f"  ✓  master-section.pd  (stereo-sum VU{tag})")
 
 
 def write_vu_sender(channels, vu_host, vu_port, vu_ms):
@@ -203,9 +262,15 @@ def write_vu_sender(channels, vu_host, vu_port, vu_ms):
     print("  ✓  vu-sender.pd")
 
 
-def write_main(channels, osc_in_port):
+def write_main(channels, osc_in_port, with_ttb=False, sampler_cfg=None):
+    """Schrijf touchlab-mixer.pd of touchlab-mixer-ttb.pd.
+
+    Als with_ttb=True: voegt sampler-router, sampler-slots, en een tweede
+    FUDI-input (UDP 9002) toe voor sampler-commando's.
+    """
     N = len(channels)
-    lines = ["#N canvas 0 0 900 800 12;"]
+    suffix = "-ttb" if with_ttb else ""
+    lines = ["#N canvas 0 0 1400 900 12;"]
     n = [0]
     def add(l):
         lines.append(l); i = n[0]; n[0]+=1; return i
@@ -215,7 +280,7 @@ def write_main(channels, osc_in_port):
     dsp = add("#X msg 20 42 \\; pd dsp 1;")
     lines.append(f"#X connect {lb} 0 {dsp} 0;")
 
-    # OSC ontvangst (TCP — PD luistert als server)
+    # OSC ontvangst voor mixer commands (TCP op 9000)
     nr  = add(f"#X obj 20 80 netreceive {osc_in_port};")
 
     # Subpatches (als abstracties, zonder 'pd' prefix)
@@ -255,9 +320,67 @@ def write_main(channels, osc_in_port):
     lines.append(f"#X connect {lb} 0 {cm} 0;")
     lines.append(f"#X connect {cm} 0 {cs} 0;")
 
-    with open("touchlab-mixer.pd", "w") as f:
+    # ------------------------------------------------------------------
+    # TTB: sampler-router, sampler slots, sampler FUDI input, status out
+    # ------------------------------------------------------------------
+    if with_ttb and sampler_cfg:
+        slots   = sampler_cfg.get("slots", 8)
+        s_port  = sampler_cfg.get("fudi_port", 9002)
+        s_stat  = sampler_cfg.get("status_port", 9003)
+
+        yt = 80
+        # Sampler UDP netreceive
+        s_nr  = add(f"#X obj 900 {yt} netreceive -u -b {s_port};")
+        s_fp  = add(f"#X obj 900 {yt+30} fudiparse;")
+        s_rt  = add(f"#X obj 900 {yt+60} route sampler-load sampler-play sampler-stop sampler-vol sampler-speed sampler-rec-start sampler-rec-stop sampler-trim sampler-trim-end sampler-autotrim sampler-autotrim-threshold sampler-autotrim-preroll sampler-router-input;")
+        lines.append(f"#X connect {s_nr} 0 {s_fp} 0;")
+        lines.append(f"#X connect {s_fp} 0 {s_rt} 0;")
+
+        # 13 sends for each route outlet
+        send_names = [
+            "sampler-load", "sampler-play", "sampler-stop",
+            "sampler-vol", "sampler-speed", "sampler-rec-start",
+            "sampler-rec-stop", "sampler-trim", "sampler-trim-end",
+            "sampler-autotrim", "sampler-autotrim-threshold",
+            "sampler-autotrim-preroll", "sampler-router-input",
+        ]
+        for i, sname in enumerate(send_names):
+            sx = 900 + (i % 7) * 100
+            sy = yt + 100 + (i // 7) * 30
+            s_s = add(f"#X obj {sx} {sy} s {sname};")
+            lines.append(f"#X connect {s_rt} {i} {s_s} 0;")
+
+        # unknown-catch
+        yt2 = yt + 180
+        s_unk = add(f"#X obj 900 {yt2} print sampler-unknown-fudi;")
+        lines.append(f"#X connect {s_rt} {len(send_names)} {s_unk} 0;")
+
+        # Status return: UDP out
+        yt3 = yt2 + 40
+        s_stat_r = add(f"#X obj 900 {yt3} r sampler-status-out;")
+        s_ns     = add(f"#X obj 900 {yt3+30} netsend -u -b;")
+        m_connect = add(f"#X msg 900 {yt3+60} connect 127.0.0.1 {s_stat};")
+        lines.append(f"#X connect {s_stat_r} 0 {s_ns} 0;")
+        lines.append(f"#X connect {lb} 0 {m_connect} 0;")
+        lines.append(f"#X connect {m_connect} 0 {s_ns} 0;")
+
+        # Router abstraction
+        yt4 = yt3 + 120
+        s_router = add(f"#X obj 900 {yt4} sampler-router;")
+
+        # Slot abstractions (2 cols x 4 rows)
+        for i in range(slots):
+            col = i // 4
+            row = i % 4
+            sx = 1100 + col * 150
+            sy = 80 + row * 50
+            add(f"#X obj {sx} {sy} sampler-slot-{i + 1};")
+
+    fname = f"touchlab-mixer{suffix}.pd"
+    with open(fname, "w") as f:
         f.write("\n".join(lines) + "\n")
-    print(f"  ✓  touchlab-mixer.pd  ({N} kanalen, TCP poort {osc_in_port})")
+    print(f"  ✓  {fname}  ({N} kanalen, TCP poort {osc_in_port}"
+          f"{', +TTB sampler' if with_ttb else ''})")
 
 
 def generate(config_path):
@@ -269,33 +392,52 @@ def generate(config_path):
     vu_host    = cfg.get("vu_send_host", "127.0.0.1")
     vu_port    = cfg.get("vu_send_port", 9001)
     vu_ms      = cfg.get("vu_interval_ms", 50)
+    sampler    = cfg.get("sampler", {})
+    ttb_enable = sampler.get("enabled", False)
 
-    print(f"TouchLab Mixer — {len(channels)} kanalen")
+    print(f"TouchLab Mixer — {len(channels)} kanalen"
+          f"{' + TTB sampler' if ttb_enable else ''}")
     print("─" * 40)
 
+    # Channels — with or without sampler tap
     for ch in channels:
-        write_channel(ch["index"], ch["name"])
+        write_channel(ch["index"], ch["name"], with_sampler_tap=ttb_enable)
 
     write_fx_bus()
-    write_master()
+    write_master(with_sampler_tap=ttb_enable)
     write_vu_sender(channels, vu_host, vu_port, vu_ms)
-    write_main(channels, osc_port)
+
+    # Always write basic mixer
+    write_main(channels, osc_port, with_ttb=False)
+    # Additionally write ttb variant if enabled
+    if ttb_enable:
+        write_main(channels, osc_port, with_ttb=True, sampler_cfg=sampler)
 
     print()
     print("Gegenereerde bestanden:")
     for ch in channels:
         print(f"  ch{ch['index']}.pd")
-    for f in ["fx-bus.pd","master-section.pd","vu-sender.pd","touchlab-mixer.pd"]:
+    base_files = ["fx-bus.pd", "master-section.pd", "vu-sender.pd",
+                  "touchlab-mixer.pd"]
+    if ttb_enable:
+        base_files.append("touchlab-mixer-ttb.pd")
+    for f in base_files:
         print(f"  {f}")
     print()
     print("Start:")
-    print("  pd -nogui -jack -r 48000 touchlab-mixer.pd")
+    print("  pd -nogui -jack -r 48000 touchlab-mixer.pd          # basic")
+    if ttb_enable:
+        print("  pd -nogui -jack -r 48000 touchlab-mixer-ttb.pd      # met TTB")
     print()
     print("OSC adressen (via bridge):")
     for ch in channels:
         i = ch["index"]
         print(f"  ch{i}-vol / ch{i}-pan / ch{i}-gate / ch{i}-fx   ({ch['name']})")
     print("  masterVol / hpVol / fxReturn")
+    if ttb_enable:
+        print()
+        print("Sampler (TTB) FUDI:")
+        print(f"  UDP {sampler.get('fudi_port', 9002)} in, UDP {sampler.get('status_port', 9003)} out")
 
 if __name__ == "__main__":
     cfg = sys.argv[1] if len(sys.argv) > 1 else "session.json"

@@ -29,6 +29,7 @@
 #X obj 170 460 s ch4-gate;
 #X msg 250 440 0;
 #X obj 250 460 s ch4-fx;
+#X obj 400 240 send~ sampler-src-ch4;
 #X connect 0 0 4 0;
 #X connect 1 0 2 0;
 #X connect 2 0 3 0;
@@ -57,3 +58,4 @@
 #X connect 24 0 25 0;
 #X connect 26 0 27 0;
 #X connect 28 0 29 0;
+#X connect 8 0 30 0;

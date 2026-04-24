@@ -1,4 +1,4 @@
-#N canvas 157 70 665 464 12;
+#N canvas 0 0 450 520 12;
 #X obj 10 20 catch~ ch1;
 #X obj 10 60 r ch1-vol;
 #X obj 10 80 pack f 10;
@@ -16,7 +16,7 @@
 #X obj 10 300 r ch1-pan;
 #X obj 10 330 panner;
 #X obj 10 370 throw~ masterL;
-#X obj 66 350 throw~ masterR;
+#X obj 50 370 throw~ masterR;
 #X obj 320 240 env~;
 #X obj 320 260 - 100;
 #X obj 320 280 s ch1-vu;
@@ -29,6 +29,7 @@
 #X obj 170 460 s ch1-gate;
 #X msg 250 440 0;
 #X obj 250 460 s ch1-fx;
+#X obj 400 240 send~ sampler-src-ch1;
 #X connect 0 0 4 0;
 #X connect 1 0 2 0;
 #X connect 2 0 3 0;
@@ -57,3 +58,4 @@
 #X connect 24 0 25 0;
 #X connect 26 0 27 0;
 #X connect 28 0 29 0;
+#X connect 8 0 30 0;

@@ -1,5 +1,5 @@
 /**
- * TouchLab Mixer Bridge — met opname functie
+ * TouchLab Mixer Bridge — met opname functie en sampler (TTB) ondersteuning
  */
 
 const dgram   = require("dgram");
@@ -23,6 +23,13 @@ const N              = CHANNELS.length;
 const REC_DIR        = cfg.recordings_path  || path.join(process.env.HOME, "recordings");
 const TIMEMACHINE    = cfg.recording && cfg.recording.prebuffer ? cfg.recording.prebuffer : 0;
 
+// Sampler (TTB) config
+const SAMPLER_CFG     = cfg.sampler || {};
+const SAMPLER_ENABLED = !!SAMPLER_CFG.enabled;
+const SAMPLER_FUDI    = SAMPLER_CFG.fudi_port   || 9002;
+const SAMPLER_STAT    = SAMPLER_CFG.status_port || 9003;
+const SAMPLER_SLOTS   = SAMPLER_CFG.slots       || 8;
+
 // Zorg dat recordings map bestaat
 if (!fs.existsSync(REC_DIR)) fs.mkdirSync(REC_DIR, { recursive: true });
 
@@ -32,6 +39,26 @@ CHANNELS.forEach(ch => {
   state[ch.index] = { name: ch.name, vol: 0.8, pan: 0.5, mute: false, solo: false, fx: 0.0, vu: -100 };
 });
 let masterVol = 0.8, hpVol = 0.8, fxReturn = 0.0, masterVu = -100;
+
+// ─── Sampler state ─────────────────────────────────────────────────────────
+// Per slot een snapshot van wat de frontend moet weten. State (idle/recording/
+// playing) wordt bijgewerkt via sampler-status events van Pd. Overige waarden
+// (vol, speed, trim, autotrim-params) worden bijgewerkt als de frontend ze zet.
+const samplerState = {};
+for (let i = 1; i <= SAMPLER_SLOTS; i++) {
+  samplerState[i] = {
+    slot: i,
+    state: "idle",              // idle | recording | playing
+    source: "ch1",              // ch1..chN of master
+    vol: 0.8,
+    speed: 1.0,
+    trimStart: 0,
+    trimEnd: 0,
+    autotrimThreshold: -40,
+    autotrimPreroll: 50,
+    lastEvent: null,
+  };
+}
 
 // ─── Opname state ──────────────────────────────────────────────────────────
 let recProcess = null;
@@ -120,7 +147,7 @@ function computeGate(chIdx) {
   return s.solo ? 1 : 0;
 }
 
-// ─── PD FUDI ───────────────────────────────────────────────────────────────
+// ─── PD FUDI (mixer, TCP) ──────────────────────────────────────────────────
 let pdSocket = null, pdReady = false;
 
 function connectToPD() {
@@ -150,7 +177,81 @@ function initPD() {
   sendPD("hpVol", hpVol);
   sendPD("fxReturn", fxReturn);
   console.log("✓  Beginwaarden naar PD gestuurd");
+  // Na mixer-init de TTB-samples laden in de sampler-slots
+  setTimeout(loadTTBSamples, 300);
 }
+
+// ─── TTB sample-loader ─────────────────────────────────────────────────────
+// Leest ttb.slots uit session.json en laadt per slot de samples in Pd.
+// Pad is relatief tot de werkmap van Pd (meestal de map van de .pd patch),
+// of absoluut als je een volledig pad opgeeft.
+function loadTTBSamples() {
+  if (!SAMPLER_ENABLED) return;
+  const slots = Array.isArray(cfg.ttb?.slots) ? cfg.ttb.slots : [];
+  if (slots.length === 0) return;
+
+  const samplesDir = cfg.ttb?.samples_dir || "samples";
+  let loaded = 0;
+  slots.forEach(s => {
+    if (!s.slot || !s.file) return;
+    const filePath = path.isAbsolute(s.file) ? s.file : path.posix.join(samplesDir, s.file);
+    sendSampler("sampler-load", s.slot, filePath);
+    if (typeof s.vol === "number") {
+      samplerState[s.slot].vol = s.vol;
+      sendSampler("sampler-vol", s.slot, s.vol);
+    }
+    loaded++;
+  });
+  console.log(`✓  ${loaded} TTB-samples geladen`);
+}
+
+// ─── Sampler FUDI (TTB, UDP) ───────────────────────────────────────────────
+// Outbound:   bridge → Pd op SAMPLER_FUDI (9002) als text-FUDI in UDP packets
+// Inbound:    Pd → bridge op SAMPLER_STAT (9003) met sampler-status events
+const samplerOut = dgram.createSocket("udp4");
+const samplerIn  = dgram.createSocket("udp4");
+
+function sendSampler(cmd, ...args) {
+  if (!SAMPLER_ENABLED) return;
+  const msg = Buffer.from(`${cmd} ${args.join(" ")};\n`);
+  samplerOut.send(msg, SAMPLER_FUDI, "127.0.0.1", err => {
+    if (err) console.warn(`⚠  Sampler TX: ${err.message}`);
+  });
+}
+
+samplerIn.on("error", err => console.warn(`⚠  Sampler RX: ${err.message}`));
+samplerIn.on("message", buf => {
+  const line = buf.toString().replace(/;\s*$/,"").trim();
+  if (!line) return;
+  const parts = line.split(/\s+/);
+  if (parts[0] !== "sampler-status" || parts.length < 3) return;
+
+  const slot = parseInt(parts[1]);
+  if (!samplerState[slot]) return;
+
+  const event = parts[2];
+  const extra = parts.slice(3).join(" ") || null;
+
+  // State-machine: mappen van event naar state-veld
+  switch (event) {
+    case "recording":   samplerState[slot].state = "recording"; break;
+    case "rec-stopped": samplerState[slot].state = "idle";      break;
+    case "playing":     samplerState[slot].state = "playing";   break;
+    case "stopped":     samplerState[slot].state = "idle";      break;
+    case "input":       if (extra) samplerState[slot].source = extra; break;
+    // autotrim-done en overige events: geen state-wijziging, alleen event doorzetten
+  }
+  samplerState[slot].lastEvent = event;
+
+  broadcast({
+    type: "samplerStatus",
+    slot,
+    event,
+    state: samplerState[slot].state,
+    source: samplerState[slot].source,
+    extra,
+  });
+});
 
 // ─── VU ────────────────────────────────────────────────────────────────────
 const vuServer = dgram.createSocket("udp4");
@@ -180,6 +281,7 @@ wss.on("connection", ws => {
     })),
     master: { vol: masterVol, hp: hpVol, fxReturn },
     ttb: cfg.ttb || null,
+    sampler: SAMPLER_ENABLED ? { enabled: true, slots: Object.values(samplerState) } : null,
   }));
   ws.on("message", raw => { try { handleFrontendMessage(JSON.parse(raw)); } catch {} });
   ws.on("close", () => { wsClients.delete(ws); console.log(`-  Frontend verbroken (${wsClients.size} clients)`); });
@@ -198,18 +300,79 @@ function broadcastVU() {
 function handleFrontendMessage(msg) {
   const { type, channel, value } = msg;
   switch (type) {
+    // Mixer kanalen
     case "volume": { const v = clamp(value,0,1); state[channel].vol=v; sendPD(`ch${channel}-vol`,v); broadcast({type:"volume",channel,value:v}); break; }
     case "pan":    { const v = clamp(value,0,1); state[channel].pan=v; sendPD(`ch${channel}-pan`,v); broadcast({type:"pan",channel,value:v}); break; }
     case "mute":   { state[channel].mute=!!value; updateAllGates(); broadcast({type:"mute",channel,value:state[channel].mute}); break; }
     case "solo":   { state[channel].solo=!!value; updateAllGates(); broadcast({type:"solo",channel,value:state[channel].solo}); break; }
     case "fx":     { const v = clamp(value,0,1); state[channel].fx=v; sendPD(`ch${channel}-fx`,v); broadcast({type:"fx",channel,value:v}); break; }
+    // Master
     case "masterVol": { masterVol=clamp(value,0,1); sendPD("masterVol",masterVol); broadcast({type:"masterVol",value:masterVol}); break; }
     case "hpVol":     { hpVol=clamp(value,0,1); sendPD("hpVol",hpVol); broadcast({type:"hpVol",value:hpVol}); break; }
     case "fxReturn":  { fxReturn=clamp(value,0,1); sendPD("fxReturn",fxReturn); broadcast({type:"fxReturn",value:fxReturn}); break; }
     case "masterMute": { broadcast({type:"masterMute",value:!!value}); break; }
     case "masterPan":  { broadcast({type:"masterPan",value}); break; }
+    // Opname (jack_capture)
     case "recStart":   { startRecording(); break; }
     case "recStop":    { stopRecording(); break; }
+    // Sampler (TTB) — transport
+    case "samplerRecStart": { sendSampler("sampler-rec-start", msg.slot); break; }
+    case "samplerRecStop":  { sendSampler("sampler-rec-stop",  msg.slot); break; }
+    case "samplerPlay":     { sendSampler("sampler-play",      msg.slot); break; }
+    case "samplerStop":     { sendSampler("sampler-stop",      msg.slot); break; }
+    // Sampler — per-slot parameters (state tracking + echo broadcast)
+    case "samplerVol": {
+      const v = clamp(msg.value, 0, 1);
+      if (samplerState[msg.slot]) samplerState[msg.slot].vol = v;
+      sendSampler("sampler-vol", msg.slot, v);
+      broadcast({ type: "samplerVol", slot: msg.slot, value: v });
+      break;
+    }
+    case "samplerSpeed": {
+      const v = clamp(msg.value, 0.1, 4);
+      if (samplerState[msg.slot]) samplerState[msg.slot].speed = v;
+      sendSampler("sampler-speed", msg.slot, v);
+      broadcast({ type: "samplerSpeed", slot: msg.slot, value: v });
+      break;
+    }
+    case "samplerLoad": {
+      // msg.path — pad naar .wav relatief of absoluut
+      sendSampler("sampler-load", msg.slot, msg.path);
+      broadcast({ type: "samplerLoad", slot: msg.slot, path: msg.path });
+      break;
+    }
+    case "samplerRouterInput": {
+      // msg.source — "ch1".."chN" of "master"
+      if (samplerState[msg.slot]) samplerState[msg.slot].source = msg.source;
+      sendSampler("sampler-router-input", msg.slot, msg.source);
+      broadcast({ type: "samplerRouterInput", slot: msg.slot, source: msg.source });
+      break;
+    }
+    case "samplerTrim": {
+      if (samplerState[msg.slot]) samplerState[msg.slot].trimStart = msg.value;
+      sendSampler("sampler-trim", msg.slot, msg.value);
+      broadcast({ type: "samplerTrim", slot: msg.slot, value: msg.value });
+      break;
+    }
+    case "samplerTrimEnd": {
+      if (samplerState[msg.slot]) samplerState[msg.slot].trimEnd = msg.value;
+      sendSampler("sampler-trim-end", msg.slot, msg.value);
+      broadcast({ type: "samplerTrimEnd", slot: msg.slot, value: msg.value });
+      break;
+    }
+    case "samplerAutotrim": { sendSampler("sampler-autotrim", msg.slot); break; }
+    case "samplerAutotrimThreshold": {
+      if (samplerState[msg.slot]) samplerState[msg.slot].autotrimThreshold = msg.value;
+      sendSampler("sampler-autotrim-threshold", msg.slot, msg.value);
+      broadcast({ type: "samplerAutotrimThreshold", slot: msg.slot, value: msg.value });
+      break;
+    }
+    case "samplerAutotrimPreroll": {
+      if (samplerState[msg.slot]) samplerState[msg.slot].autotrimPreroll = msg.value;
+      sendSampler("sampler-autotrim-preroll", msg.slot, msg.value);
+      broadcast({ type: "samplerAutotrimPreroll", slot: msg.slot, value: msg.value });
+      break;
+    }
     default: console.warn("Onbekend bericht type:", type);
   }
 }
@@ -228,7 +391,15 @@ httpServer.listen(WS_PORT, () => {
   console.log(`WebSocket:  ws://localhost:${WS_PORT}`);
   console.log(`Downloads:  http://localhost:${WS_PORT}/recordings`);
   console.log(`Opnames in: ${REC_DIR}`);
+  if (SAMPLER_ENABLED) {
+    console.log(`Sampler:    ${SAMPLER_SLOTS} slots · cmd→UDP ${SAMPLER_FUDI} · status←UDP ${SAMPLER_STAT}`);
+  } else {
+    console.log(`Sampler:    uitgeschakeld (zet cfg.sampler.enabled op true)`);
+  }
   console.log("─".repeat(40));
 });
 
 connectToPD();
+if (SAMPLER_ENABLED) {
+  samplerIn.bind(SAMPLER_STAT, () => console.log(`✓  Sampler status luisteren op UDP ${SAMPLER_STAT}`));
+}

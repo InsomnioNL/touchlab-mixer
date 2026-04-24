@@ -321,6 +321,16 @@ html,body{
   border-radius:4px;color:rgba(176,106,245,0.8);font-size:12px;
   cursor:pointer;padding:2px 8px;line-height:1;flex-shrink:0;
 }
+.ttb-edit-btn{
+  background:rgba(176,106,245,0.1);border:1px solid rgba(176,106,245,0.3);
+  border-radius:4px;color:rgba(176,106,245,0.8);font-size:11px;
+  cursor:pointer;padding:2px 7px;line-height:1;flex-shrink:0;
+  margin-right:6px;
+}
+.ttb-edit-btn.active{
+  background:rgba(176,106,245,0.4);
+  color:rgba(255,255,255,1);
+}
 .ttb-body{
   overflow-y:auto;overflow-x:hidden;
   padding:12px 14px;
@@ -351,6 +361,16 @@ html,body{
 .ttb-trigger.flash{
   background:rgba(176,106,245,0.4);
   border-color:rgba(176,106,245,1);
+}
+.ttb-trigger.playing{
+  background:rgba(69,230,143,0.25);
+  border-color:rgba(69,230,143,0.8);
+  color:rgba(255,255,255,1);
+}
+.ttb-popup.edit-mode .ttb-trigger{
+  border-style:dashed;
+  border-color:rgba(240,185,58,0.7);
+  background:rgba(240,185,58,0.08);
 }
 .ttb-section-label{
   font-size:7px;color:rgba(255,255,255,0.25);
@@ -522,6 +542,7 @@ function connect(url){
       return;
     }
     if(msg.type==='vu'){masterVu=msg.masterVu||-60;(msg.channels||[]).forEach(u=>{var c=channels.find(x=>x.index===u.index);if(c)c.vu=u.vu});updateVUs();return}
+    if(msg.type==='samplerStatus'){handleSamplerStatus(msg);return}
     var ch=channels.find(c=>c.index===msg.channel);
     if(ch){
       if(msg.type==='volume'){ch.vol=msg.value;setFP(ch.index,ch.vol)}
@@ -1199,19 +1220,17 @@ function openRecording(){
 
 
 // ── TapTapBoom ──────────────────────────────────────────────────────────────
-var ttbTriggers = [];
+var ttbSlots = [];           // configured slots: [{slot, file, label, vol}, ...]
+var ttbEditMode = false;     // toggled via pencil button
+var intendedStates = {};     // slot N → 'idle' | 'playing' (what user wants)
+var PRESS_THRESHOLD = 200;   // ms — shorter = one-shot, longer = gated
 
 function initTTB(){
-  // Laad triggers uit session config of gebruik defaults
-  var defaults = [
-    {label:'UPBEAT\n2', osc:'/ttb/upbeat2'},
-    {label:'UPBEAT\n3', osc:'/ttb/upbeat3'},
-    {label:'UPBEAT\n4', osc:'/ttb/upbeat4'},
-    {label:'BOEM', osc:'/ttb/boem'},
-    {label:'TAP', osc:'/ttb/tap'},
-    {label:'SAMPLE', osc:'/ttb/sample'},
-  ];
-  ttbTriggers = (window.ttbConfig && window.ttbConfig.triggers) || defaults;
+  // slots komt uit session.json (ttb.slots) via het init-bericht van de bridge
+  ttbSlots = (window.ttbConfig && Array.isArray(window.ttbConfig.slots))
+    ? window.ttbConfig.slots
+    : [];
+  ttbSlots.forEach(function(s){ if (!(s.slot in intendedStates)) intendedStates[s.slot] = 'idle'; });
   renderTTBGrid();
 }
 
@@ -1219,28 +1238,102 @@ function renderTTBGrid(){
   var grid = document.getElementById('ttb-grid');
   if(!grid) return;
   grid.innerHTML = '';
-  ttbTriggers.forEach(function(t, i){
+  ttbSlots.forEach(function(s){
     var btn = document.createElement('button');
     btn.className = 'ttb-trigger';
-    btn.innerHTML = t.label.replace(/\n/g,'<br>');
-    btn.addEventListener('click', function(){fireTTB(i);});
-    btn.addEventListener('touchend', function(e){e.preventDefault();fireTTB(i);},{passive:false});
+    btn.setAttribute('data-slot', s.slot);
+    btn.innerHTML = getSlotLabel(s).replace(/\n/g,'<br>');
+
+    if (ttbEditMode) {
+      // In edit mode: klikken opent rename-prompt
+      btn.addEventListener('click', function(e){
+        e.preventDefault();
+        editSlotLabel(s);
+      });
+    } else {
+      // Performance mode: press/hold logic
+      var pressTime = 0;
+      var startedPlayback = false;
+
+      btn.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        pressTime = Date.now();
+        if (intendedStates[s.slot] === 'playing') {
+          // Slot speelt al: tweede tap = stop
+          send({type:'samplerStop', slot:s.slot});
+          intendedStates[s.slot] = 'idle';
+          startedPlayback = false;
+        } else {
+          send({type:'samplerPlay', slot:s.slot});
+          intendedStates[s.slot] = 'playing';
+          startedPlayback = true;
+        }
+        // Visuele flash bij press
+        btn.classList.add('flash');
+        setTimeout(function(){btn.classList.remove('flash');}, 150);
+      });
+
+      function onRelease(){
+        if (!startedPlayback) return; // we hebben geen playback gestart, niks te doen
+        var held = Date.now() - pressTime;
+        if (held >= PRESS_THRESHOLD) {
+          // Long press: stop on release (gated mode)
+          send({type:'samplerStop', slot:s.slot});
+          intendedStates[s.slot] = 'idle';
+        }
+        // Short press: laat uitspelen (one-shot)
+        startedPlayback = false;
+      }
+      btn.addEventListener('pointerup', function(e){ e.preventDefault(); onRelease(); });
+      btn.addEventListener('pointercancel', onRelease);
+      btn.addEventListener('pointerleave', function(){ /* don't trigger release on leave */ });
+    }
     grid.appendChild(btn);
+  });
+  // Visuele staat (playing-indicator) opnieuw aanbrengen na render
+  ttbSlots.forEach(function(s){
+    var btn = document.querySelector('.ttb-trigger[data-slot="'+s.slot+'"]');
+    if (btn && intendedStates[s.slot] === 'playing') btn.classList.add('playing');
   });
 }
 
-function fireTTB(idx){
-  var t = ttbTriggers[idx];
-  if(!t) return;
-  // Visuele flash
-  var btns = document.querySelectorAll('.ttb-trigger');
-  if(btns[idx]){
-    btns[idx].classList.add('flash');
-    setTimeout(function(){btns[idx].classList.remove('flash');}, 150);
+function getSlotLabel(s){
+  var override = lsLoad('ttb_label_'+s.slot, null);
+  return (override !== null && override !== '') ? override : s.label;
+}
+
+function editSlotLabel(s){
+  var current = getSlotLabel(s);
+  var next = prompt('Nieuwe naam voor slot '+s.slot+' (leeg = terug naar default):', current);
+  if (next === null) return; // cancel
+  if (next === '' || next === s.label) {
+    // Reset naar default uit session.json
+    try { localStorage.removeItem(lsKey('ttb_label_'+s.slot)); } catch(e){}
+  } else {
+    lsSave('ttb_label_'+s.slot, next);
   }
-  // Stuur OSC via bridge
-  send({type:'ttb', osc:t.osc, label:t.label});
-  console.log('TTB:', t.osc);
+  renderTTBGrid();
+}
+
+function toggleTTBEdit(){
+  ttbEditMode = !ttbEditMode;
+  document.getElementById('ttb-popup').classList.toggle('edit-mode', ttbEditMode);
+  document.getElementById('ttb-edit-btn').classList.toggle('active', ttbEditMode);
+  renderTTBGrid();
+}
+
+function handleSamplerStatus(msg){
+  // Synchroniseer intendedStates met wat Pd rapporteert — ook als de sampler
+  // extern wordt getriggerd (voetpedaal, TouchOSC, nc-commando) weet de UI
+  // wat er speelt.
+  if (msg.state === 'playing' || msg.state === 'idle') {
+    intendedStates[msg.slot] = msg.state;
+  }
+  // Visuele indicatie op de knop (als die zichtbaar is)
+  var btn = document.querySelector('.ttb-trigger[data-slot="'+msg.slot+'"]');
+  if (!btn) return;
+  if (msg.state === 'playing') btn.classList.add('playing');
+  else btn.classList.remove('playing');
 }
 
 function openTTB(){
@@ -1315,7 +1408,10 @@ function closeTTB(){
 <div class="ttb-popup hidden" id="ttb-popup">
   <div class="ttb-popup-header" id="ttb-header">
     <div class="ttb-popup-title">TAP TAP BOOM</div>
-    <button class="ttb-close" onclick="closeTTB()">&#x2715;</button>
+    <div style="display:flex;align-items:center;gap:0">
+      <button class="ttb-edit-btn" id="ttb-edit-btn" onclick="toggleTTBEdit()" title="Hernoem slots">&#x270E;</button>
+      <button class="ttb-close" onclick="closeTTB()">&#x2715;</button>
+    </div>
   </div>
   <div class="ttb-body">
     <div class="ttb-section-label">TRIGGERS</div>

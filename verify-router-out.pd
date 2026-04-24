@@ -1,0 +1,18 @@
+#N canvas 80 80 600 400 12;
+#X text 10 10 *** VERIFY ROUTER OUTPUT — post-fix ***;
+#X text 10 30 Open alongside touchlab-mixer-ttb.pd and verify-tests.pd.;
+#X text 10 50 Turn on the Section C tgl in verify-tests.pd (tone into ch1).;
+#X text 10 70 With the router-fix applied\, D should show high dB (60-80).;
+#X text 10 90 With the bug still present\, D stays at 0 or near-silence.;
+#X obj 10 140 receive~ slot1-src-sig;
+#X obj 10 170 env~ 4096;
+#X obj 10 200 int;
+#X obj 10 230 change;
+#X obj 10 260 print D-router-slot1-out-dB;
+#X text 10 310 If D is alive but rec-test still silent -> the problem is in sampler-slot-1 itself.;
+#X text 10 330 If D is silent while Section C shows tone -> router is still not propagating.;
+#X text 10 350 If D matches Section C levels -> the full chain works\, do the rec-test.;
+#X connect 5 0 6 0;
+#X connect 6 0 7 0;
+#X connect 7 0 8 0;
+#X connect 8 0 9 0;

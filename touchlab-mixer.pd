@@ -1,4 +1,4 @@
-#N canvas 0 0 900 800 12;
+#N canvas 0 0 1400 900 12;
 #X obj 20 20 loadbang;
 #X msg 20 42 \; pd dsp 1;
 #X connect 0 0 1 0;
