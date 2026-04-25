@@ -1,0 +1,12 @@
+# Lokale werkversies van sessies (per-eindpunt, niet delen)
+sessions/
+
+# Lokale opnames (auto-gegenereerd)
+recordings/
+
+# macOS systeembestanden
+.DS_Store
+
+# Tijdelijke bestanden
+*.tmp
+*.bak

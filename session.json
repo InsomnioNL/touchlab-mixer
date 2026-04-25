@@ -6,10 +6,26 @@
   "vu_interval_ms": 50,
   "ws_port": 8080,
   "channels": [
-    { "index": 1, "name": "Bas",    "type": "mono" },
-    { "index": 2, "name": "Piano",  "type": "mono" },
-    { "index": 3, "name": "Gitaar", "type": "mono" },
-    { "index": 4, "name": "Zang",   "type": "mono" }
+    {
+      "index": 1,
+      "name": "Bas",
+      "type": "mono"
+    },
+    {
+      "index": 2,
+      "name": "Piano",
+      "type": "mono"
+    },
+    {
+      "index": 3,
+      "name": "Gitaar",
+      "type": "mono"
+    },
+    {
+      "index": 4,
+      "name": "Zang",
+      "type": "mono"
+    }
   ],
   "sampler": {
     "enabled": true,
@@ -20,13 +36,58 @@
     "defaults": {
       "input": "ch1",
       "vol": 0.8,
-      "speed": 1.0,
+      "speed": 1,
       "autotrim_threshold_db": -40,
       "autotrim_preroll_ms": 50
     }
   },
   "ttb": {
-    "enabled": true,
-    "title": "TTB — TapTapBoom"
+    "samples_dir": "samples",
+    "default_slot_count": 2,
+    "slots": [
+      {
+        "slot": 1,
+        "file": "slot1.wav",
+        "label": "SLOT 1",
+        "vol": 0.8,
+        "color": "neutral"
+      },
+      {
+        "slot": 5,
+        "file": "slot5.wav",
+        "label": "SLOT 5",
+        "vol": 0.8,
+        "color": "gold"
+      },
+      {
+        "slot": 2,
+        "file": "attenborough.wav",
+        "label": "attenb",
+        "vol": 0.8,
+        "color": "lime"
+      },
+      {
+        "slot": 3,
+        "file": "slot4.wav",
+        "label": "SLOT 3",
+        "vol": 0.8,
+        "color": "neutral"
+      },
+      {
+        "slot": 4,
+        "file": "slot2.wav",
+        "label": "BKBK",
+        "vol": 0.8,
+        "color": "magenta"
+      }
+    ],
+    "button_order": [
+      1,
+      5,
+      2,
+      3,
+      4
+    ],
+    "queue": []
   }
 }

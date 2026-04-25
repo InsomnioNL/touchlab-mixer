@@ -286,26 +286,29 @@ html,body{
 }
 .ttb-btn:active{background:rgba(176,106,245,0.2);}
 
-/* TTB Popup */
+/* TTB Popup v0.4 — brede floating overlay met edit-modus */
+:root{
+  --ttb-color-intensity: 1.3; /* 1.0 = zacht, 1.4 = fel — pas aan naar smaak */
+}
 .ttb-popup{
   position:fixed;z-index:9998;
-  top:10%;left:50%;transform:translateX(-50%);
+  top:5%;left:50%;transform:translateX(-50%);
   background:rgba(10,2,25,0.97);
   border:1px solid rgba(176,106,245,0.4);
   border-radius:10px;
   padding:0;
-  width:min(480px,92vw);
-  min-width:240px;
-  min-height:160px;
-  max-height:80vh;
+  width:min(800px,95vw);
+  height:auto;
+  min-width:320px;min-height:240px;
+  max-width:98vw;max-height:90vh;
   box-shadow:0 8px 40px rgba(0,0,0,0.8);
   display:flex;flex-direction:column;
   resize:both;overflow:hidden;
 }
 .ttb-popup.hidden{display:none}
 .ttb-popup-header{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:10px 14px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:8px 12px;
   border-bottom:1px solid rgba(176,106,245,0.15);
   cursor:grab;
   flex-shrink:0;
@@ -315,69 +318,509 @@ html,body{
 .ttb-popup-title{
   font-size:10px;color:rgba(176,106,245,0.8);
   font-family:var(--mono);letter-spacing:.2em;
+  flex-shrink:0;
 }
+.ttb-header-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .ttb-close{
   background:rgba(176,106,245,0.1);border:1px solid rgba(176,106,245,0.3);
   border-radius:4px;color:rgba(176,106,245,0.8);font-size:12px;
-  cursor:pointer;padding:2px 8px;line-height:1;flex-shrink:0;
+  cursor:pointer;padding:3px 8px;line-height:1;flex-shrink:0;
 }
-.ttb-edit-btn{
+/* Slot-count pillen */
+.ttb-count-pills{display:flex;gap:2px;}
+.ttb-count-pill{
+  background:rgba(176,106,245,0.08);border:1px solid rgba(176,106,245,0.25);
+  color:rgba(176,106,245,0.7);font-size:10px;font-family:var(--mono);
+  cursor:pointer;padding:3px 7px;line-height:1;border-radius:3px;
+  min-width:20px;text-align:center;
+}
+.ttb-count-pill.active{
+  background:rgba(176,106,245,0.35);color:rgba(255,255,255,0.95);
+  border-color:rgba(176,106,245,0.7);
+}
+/* Queue-navigatie */
+.ttb-queue-nav{
+  display:flex;align-items:center;gap:4px;
+  font-family:var(--mono);font-size:10px;
+  color:rgba(176,106,245,0.7);
+}
+.ttb-queue-nav.hidden{display:none}
+.ttb-queue-arrow{
   background:rgba(176,106,245,0.1);border:1px solid rgba(176,106,245,0.3);
-  border-radius:4px;color:rgba(176,106,245,0.8);font-size:11px;
-  cursor:pointer;padding:2px 7px;line-height:1;flex-shrink:0;
-  margin-right:6px;
+  color:rgba(176,106,245,0.8);font-size:11px;
+  cursor:pointer;padding:2px 8px;border-radius:3px;line-height:1;
 }
-.ttb-edit-btn.active{
-  background:rgba(176,106,245,0.4);
-  color:rgba(255,255,255,1);
-}
+.ttb-queue-pos{padding:0 4px;letter-spacing:.1em;}
+/* Body: grid + dots + fader */
 .ttb-body{
-  overflow-y:auto;overflow-x:hidden;
-  padding:12px 14px;
+  display:flex;flex-direction:column;
   flex:1;
-  scrollbar-width:thin;
-  scrollbar-color:rgba(176,106,245,0.3) transparent;
+  overflow:hidden;
+  padding:0;
 }
+.ttb-grid-wrap{
+  display:flex;align-items:stretch;gap:8px;
+  flex:1;
+  padding:12px 8px;
+  min-height:0;
+}
+.ttb-page-btn{
+  background:rgba(176,106,245,0.08);border:1px solid rgba(176,106,245,0.25);
+  border-radius:6px;color:rgba(176,106,245,0.7);
+  font-size:20px;cursor:pointer;
+  width:38px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  user-select:none;
+}
+.ttb-page-btn:active{background:rgba(176,106,245,0.2);}
+.ttb-page-btn.hidden{display:none}
+.ttb-page-btn.disabled{opacity:0.25;pointer-events:none;}
 .ttb-grid{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
-  margin-bottom:12px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  flex:1;min-height:0;
 }
 .ttb-trigger{
-  height:52px;border-radius:6px;
-  border:1px solid rgba(176,106,245,0.35);
+  border-radius:8px;
+  border:2px solid rgba(176,106,245,0.35);
   background:rgba(176,106,245,0.06);
-  color:rgba(255,255,255,0.85);
-  font-family:var(--mono);font-size:9px;
-  cursor:pointer;letter-spacing:.08em;
-  transition:all .12s;
+  color:rgba(255,255,255,0.9);
+  font-family:var(--mono);font-size:13px;
+  cursor:pointer;letter-spacing:.06em;
+  transition:background .1s, border-color .1s, transform .08s;
   display:flex;align-items:center;justify-content:center;
-  text-align:center;padding:4px;line-height:1.3;
+  text-align:center;padding:8px;line-height:1.3;
+  position:relative;
+  min-height:80px;
+  user-select:none;
 }
-.ttb-trigger:active{
-  background:rgba(176,106,245,0.3);
-  border-color:rgba(176,106,245,0.8);
-  transform:scale(0.97);
-}
-.ttb-trigger.flash{
-  background:rgba(176,106,245,0.4);
-  border-color:rgba(176,106,245,1);
-}
+.ttb-trigger:active{transform:scale(0.97);}
+.ttb-trigger.flash{filter:brightness(1.4);}
 .ttb-trigger.playing{
-  background:rgba(69,230,143,0.25);
-  border-color:rgba(69,230,143,0.8);
-  color:rgba(255,255,255,1);
+  box-shadow:0 0 0 3px rgba(69,230,143,0.8), 0 0 16px rgba(69,230,143,0.4);
 }
-.ttb-popup.edit-mode .ttb-trigger{
-  border-style:dashed;
-  border-color:rgba(240,185,58,0.7);
-  background:rgba(240,185,58,0.08);
+.ttb-trigger.queue-next{
+  border-style:solid;border-width:3px;
+  border-color:rgba(255,255,255,0.9);
+  box-shadow:inset 0 0 0 1px rgba(176,106,245,0.6);
+}
+.ttb-trigger.queue-next::before{
+  content:"";
+  position:absolute;top:6px;right:6px;
+  width:10px;height:10px;border-radius:50%;
+  border:2px solid rgba(255,255,255,0.95);
+}
+/* Paletkleuren per knop — gebruiken --ttb-color-intensity */
+.ttb-trigger[data-color="neutral"]{background:rgba(176,106,245,calc(0.06 * var(--ttb-color-intensity)));border-color:rgba(176,106,245,calc(0.35 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="purple"] {background:rgba(176,106,245,calc(0.20 * var(--ttb-color-intensity)));border-color:rgba(176,106,245,calc(0.65 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="green"]  {background:rgba(69,230,143,calc(0.20 * var(--ttb-color-intensity)));border-color:rgba(69,230,143,calc(0.55 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="lime"]   {background:rgba(180,255,80,calc(0.20 * var(--ttb-color-intensity)));border-color:rgba(180,255,80,calc(0.60 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="gold"]   {background:rgba(240,185,58,calc(0.20 * var(--ttb-color-intensity)));border-color:rgba(240,185,58,calc(0.60 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="orange"] {background:rgba(255,140,60,calc(0.20 * var(--ttb-color-intensity)));border-color:rgba(255,140,60,calc(0.65 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="red"]    {background:rgba(240,70,80,calc(0.20 * var(--ttb-color-intensity)));border-color:rgba(240,70,80,calc(0.70 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="magenta"]{background:rgba(240,90,200,calc(0.20 * var(--ttb-color-intensity)));border-color:rgba(240,90,200,calc(0.65 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="blue"]   {background:rgba(80,140,250,calc(0.22 * var(--ttb-color-intensity)));border-color:rgba(80,140,250,calc(0.65 * var(--ttb-color-intensity)));}
+.ttb-trigger[data-color="cyan"]   {background:rgba(80,220,240,calc(0.20 * var(--ttb-color-intensity)));border-color:rgba(80,220,240,calc(0.60 * var(--ttb-color-intensity)));}
+/* Queue-dots */
+.ttb-queue-dots{
+  display:flex;align-items:center;justify-content:center;gap:14px;
+  padding:4px 12px 6px;
+  flex-shrink:0;
+  min-height:28px;
+}
+.ttb-queue-dots.hidden{display:none}
+.ttb-queue-dot{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  cursor:pointer;
+}
+.ttb-queue-dot-circle{
+  width:10px;height:10px;border-radius:50%;
+  border:1.5px solid rgba(176,106,245,0.5);
+  background:transparent;
+  transition:all .15s;
+}
+.ttb-queue-dot.done .ttb-queue-dot-circle{
+  background:rgba(176,106,245,0.85);border-color:rgba(176,106,245,0.85);
+}
+.ttb-queue-dot.current .ttb-queue-dot-circle{
+  width:14px;height:14px;
+  background:rgba(255,255,255,0.95);border-color:rgba(255,255,255,0.95);
+  box-shadow:0 0 8px rgba(176,106,245,0.6);
+}
+.ttb-queue-dot-label{
+  font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);
+  letter-spacing:.05em;
+}
+.ttb-queue-dot.current .ttb-queue-dot-label{color:rgba(255,255,255,0.9);}
+/* Fader-strook */
+.ttb-fader-wrap{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;
+  border-top:1px solid rgba(176,106,245,0.15);
+  flex-shrink:0;
+}
+.ttb-fader-label{
+  font-family:var(--mono);font-size:10px;
+  color:rgba(176,106,245,0.8);
+  letter-spacing:.15em;min-width:70px;
+}
+.ttb-fader{
+  flex:1;
+  -webkit-appearance:none;appearance:none;
+  height:6px;border-radius:3px;
+  background:rgba(176,106,245,0.15);
+  outline:none;
+}
+.ttb-fader::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:22px;height:22px;border-radius:50%;
+  background:rgba(176,106,245,0.95);
+  cursor:pointer;
+  border:2px solid rgba(255,255,255,0.2);
+}
+.ttb-fader::-moz-range-thumb{
+  width:22px;height:22px;border-radius:50%;
+  background:rgba(176,106,245,0.95);
+  cursor:pointer;border:2px solid rgba(255,255,255,0.2);
+}
+.ttb-fader-val{
+  font-family:var(--mono);font-size:10px;
+  color:rgba(255,255,255,0.7);
+  min-width:40px;text-align:right;
 }
 .ttb-section-label{
   font-size:7px;color:rgba(255,255,255,0.25);
   font-family:var(--mono);letter-spacing:.15em;
   margin-bottom:6px;margin-top:4px;
 }
+
+/* ─── Edit/Rec view ─────────────────────────────────────────────── */
+.ttb-popup.mode-edit{
+  /* Hogere preset voor edit-modus */
+  min-height:480px;
+}
+/* Mode-toggle knop in header */
+.ttb-mode-toggle{
+  background:rgba(176,106,245,0.1);border:1px solid rgba(176,106,245,0.3);
+  border-radius:4px;color:rgba(176,106,245,0.85);
+  font-size:10px;font-family:var(--mono);letter-spacing:.1em;
+  cursor:pointer;padding:3px 9px;line-height:1;flex-shrink:0;
+  display:flex;align-items:center;gap:4px;
+}
+.ttb-mode-toggle.active{
+  background:rgba(240,185,58,0.25);border-color:rgba(240,185,58,0.6);
+  color:rgba(255,255,255,0.95);
+}
+/* Edit-mode action buttons */
+.ttb-edit-action{
+  background:rgba(176,106,245,0.1);border:1px solid rgba(176,106,245,0.3);
+  border-radius:4px;color:rgba(176,106,245,0.85);
+  font-size:10px;font-family:var(--mono);letter-spacing:.1em;
+  cursor:pointer;padding:3px 9px;line-height:1;flex-shrink:0;
+}
+.ttb-edit-action:hover{background:rgba(176,106,245,0.2);}
+.ttb-edit-action.dirty{
+  background:rgba(240,185,58,0.3);border-color:rgba(240,185,58,0.7);
+  color:rgba(255,255,255,0.95);
+  animation:dirty-pulse 1.5s ease-in-out infinite;
+}
+.ttb-edit-action.disabled{opacity:0.3;pointer-events:none;}
+@keyframes dirty-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(240,185,58,0.4);}
+  50%{box-shadow:0 0 0 6px rgba(240,185,58,0);}
+}
+.ttb-popup.mode-perf .ttb-edit-action{display:none;}
+/* Edit-body: 3 koloms grid */
+.ttb-edit-body{
+  display:none;
+  flex:1;
+  overflow:hidden;
+  grid-template-columns:160px 1fr 200px;
+  gap:1px;
+  background:rgba(176,106,245,0.1);
+}
+.ttb-popup.mode-edit .ttb-body{ display:none; }
+.ttb-popup.mode-edit .ttb-edit-body{ display:grid; }
+.ttb-popup.mode-perf  .ttb-edit-body{ display:none; }
+
+.ttb-edit-col{
+  background:rgba(10,2,25,0.97);
+  padding:10px 12px;
+  overflow-y:auto;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(176,106,245,0.3) transparent;
+}
+.ttb-edit-col-title{
+  font-size:9px;color:rgba(176,106,245,0.7);
+  letter-spacing:.2em;margin-bottom:8px;
+}
+
+/* Slot-lijst (links) */
+.ttb-slot-list{display:flex;flex-direction:column;gap:3px;}
+.ttb-slot-item{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 8px;border-radius:5px;
+  background:rgba(176,106,245,0.04);
+  border:1px solid rgba(176,106,245,0.15);
+  cursor:pointer;
+  font-size:11px;font-family:var(--mono);
+  color:rgba(255,255,255,0.7);
+  transition:background .12s;
+}
+.ttb-slot-item:hover{background:rgba(176,106,245,0.1);}
+.ttb-slot-item.active{
+  background:rgba(240,185,58,0.2);
+  border-color:rgba(240,185,58,0.6);
+  color:rgba(255,255,255,0.95);
+}
+.ttb-slot-item.empty{opacity:0.5;font-style:italic;}
+.ttb-slot-num{
+  font-weight:bold;color:rgba(176,106,245,0.85);
+  min-width:18px;
+}
+.ttb-slot-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ttb-slot-color{
+  width:8px;height:8px;border-radius:50%;
+  background:rgba(176,106,245,0.35);
+  flex-shrink:0;
+}
+
+/* Middenkolom: waveform + transport */
+.ttb-wave-area{
+  background:rgba(0,0,0,0.3);
+  border:1px solid rgba(176,106,245,0.2);
+  border-radius:6px;
+  height:120px;margin-bottom:10px;
+  position:relative;
+  overflow:hidden;
+}
+.ttb-wave-canvas{
+  width:100%;height:100%;
+  display:block;
+}
+.ttb-wave-empty{
+  display:flex;align-items:center;justify-content:center;
+  height:100%;color:rgba(255,255,255,0.3);
+  font-size:10px;letter-spacing:.15em;
+}
+.ttb-trim-marker{
+  position:absolute;top:0;bottom:0;
+  width:2px;background:rgba(240,185,58,0.7);
+  cursor:ew-resize;
+}
+.ttb-trim-marker.start{left:5%;}
+.ttb-trim-marker.end{right:5%;}
+
+.ttb-transport{
+  display:flex;gap:6px;margin-bottom:12px;
+}
+.ttb-trans-btn{
+  flex:1;
+  padding:10px 12px;border-radius:5px;
+  background:rgba(176,106,245,0.12);
+  border:1px solid rgba(176,106,245,0.4);
+  color:rgba(255,255,255,0.9);
+  font-size:11px;font-family:var(--mono);letter-spacing:.1em;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.ttb-trans-btn.rec{
+  background:rgba(240,70,80,0.15);
+  border-color:rgba(240,70,80,0.5);
+}
+.ttb-trans-btn.rec.active{
+  background:rgba(240,70,80,0.5);
+  border-color:rgba(240,70,80,1);
+  animation:rec-pulse 1s ease-in-out infinite;
+}
+@keyframes rec-pulse{
+  0%,100%{opacity:1;}
+  50%{opacity:0.7;}
+}
+.ttb-trans-btn:active{transform:scale(0.98);}
+
+.ttb-edit-row{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:10px;font-size:10px;
+  color:rgba(255,255,255,0.75);
+  font-family:var(--mono);
+}
+.ttb-edit-row label{
+  letter-spacing:.1em;color:rgba(176,106,245,0.85);
+  min-width:70px;
+}
+.ttb-edit-row select, .ttb-edit-row input[type=text], .ttb-edit-row input[type=number]{
+  flex:1;
+  background:rgba(0,0,0,0.3);
+  border:1px solid rgba(176,106,245,0.3);
+  color:rgba(255,255,255,0.9);
+  font-family:var(--mono);font-size:11px;
+  padding:5px 7px;border-radius:4px;
+}
+.ttb-edit-row input[type=range]{
+  flex:1;
+  -webkit-appearance:none;appearance:none;
+  height:5px;border-radius:3px;
+  background:rgba(176,106,245,0.15);outline:none;
+}
+.ttb-edit-row input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:50%;
+  background:rgba(176,106,245,0.95);cursor:pointer;
+  border:2px solid rgba(255,255,255,0.2);
+}
+.ttb-edit-row input[type=range]::-moz-range-thumb{
+  width:16px;height:16px;border-radius:50%;
+  background:rgba(176,106,245,0.95);cursor:pointer;
+  border:2px solid rgba(255,255,255,0.2);
+}
+.ttb-edit-val{
+  min-width:40px;text-align:right;
+  font-size:10px;color:rgba(255,255,255,0.7);
+}
+
+.ttb-checkbox{
+  width:14px;height:14px;
+  border:1.5px solid rgba(176,106,245,0.5);
+  border-radius:3px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.3);
+  flex-shrink:0;
+}
+.ttb-checkbox.checked{
+  background:rgba(176,106,245,0.6);
+}
+.ttb-checkbox.checked::after{
+  content:"✓";color:rgba(255,255,255,0.95);
+  font-size:10px;line-height:1;
+}
+
+/* Kleurpalet rij in edit */
+.ttb-color-palette{
+  display:flex;gap:5px;flex-wrap:wrap;
+}
+.ttb-color-swatch{
+  width:24px;height:24px;border-radius:50%;
+  cursor:pointer;
+  border:2px solid transparent;
+  transition:transform .12s, border-color .12s;
+}
+.ttb-color-swatch.selected{
+  border-color:rgba(255,255,255,0.95);
+  transform:scale(1.1);
+}
+.ttb-color-swatch[data-color="neutral"]{background:rgba(176,106,245,0.25);border:2px dashed rgba(176,106,245,0.5);}
+.ttb-color-swatch[data-color="purple"] {background:rgb(176,106,245);}
+.ttb-color-swatch[data-color="green"]  {background:rgb(69,230,143);}
+.ttb-color-swatch[data-color="lime"]   {background:rgb(180,255,80);}
+.ttb-color-swatch[data-color="gold"]   {background:rgb(240,185,58);}
+.ttb-color-swatch[data-color="orange"] {background:rgb(255,140,60);}
+.ttb-color-swatch[data-color="red"]    {background:rgb(240,70,80);}
+.ttb-color-swatch[data-color="magenta"]{background:rgb(240,90,200);}
+.ttb-color-swatch[data-color="blue"]   {background:rgb(80,140,250);}
+.ttb-color-swatch[data-color="cyan"]   {background:rgb(80,220,240);}
+
+/* Responsive: op smal scherm worden de 3 kolommen onder elkaar */
+@media (max-width: 720px){
+  .ttb-edit-body{
+    grid-template-columns:1fr;
+    grid-template-rows:auto auto auto;
+    overflow-y:auto;
+  }
+  .ttb-edit-col{max-height:none;}
+  .ttb-popup.mode-edit{min-height:0;height:auto;max-height:90vh;}
+}
+
+/* ─── File-picker overlay ───────────────────────────────────────────── */
+.ttb-filepicker{
+  position:absolute;
+  inset:0;
+  background:rgba(10,2,25,0.97);
+  z-index:5;
+  display:none;
+  flex-direction:column;
+  padding:14px 18px;
+}
+.ttb-filepicker.visible{display:flex;}
+.ttb-filepicker-title{
+  font-size:11px;color:rgba(176,106,245,0.85);
+  letter-spacing:.2em;margin-bottom:10px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.ttb-filepicker-list{
+  flex:1;overflow-y:auto;
+  display:flex;flex-direction:column;gap:3px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(176,106,245,0.3) transparent;
+}
+.ttb-filepicker-item{
+  padding:8px 10px;border-radius:4px;
+  background:rgba(176,106,245,0.05);
+  border:1px solid rgba(176,106,245,0.15);
+  color:rgba(255,255,255,0.8);
+  font-size:11px;font-family:var(--mono);
+  cursor:pointer;
+}
+.ttb-filepicker-item:hover{background:rgba(176,106,245,0.15);}
+.ttb-filepicker-item.empty{opacity:0.5;font-style:italic;cursor:default;}
+.ttb-filepicker-item.current{
+  background:rgba(240,185,58,0.2);
+  border-color:rgba(240,185,58,0.6);
+}
+.ttb-edit-row input[type=text].clickable{
+  cursor:pointer;
+}
+.ttb-edit-row input[type=text].clickable:hover{
+  background:rgba(176,106,245,0.15);
+}
+
+/* ─── Queue-editor ───────────────────────────────────────────── */
+.ttb-queue-editor{
+  border:1px solid rgba(176,106,245,0.2);
+  border-radius:6px;
+  padding:10px;margin-top:8px;
+  background:rgba(176,106,245,0.04);
+}
+.ttb-queue-editor-title{
+  font-size:9px;color:rgba(176,106,245,0.7);
+  letter-spacing:.2em;margin-bottom:6px;
+}
+.ttb-queue-editor input[type=text]{
+  width:100%;
+  background:rgba(0,0,0,0.3);
+  border:1px solid rgba(176,106,245,0.3);
+  color:rgba(255,255,255,0.9);
+  font-family:var(--mono);font-size:11px;
+  padding:5px 7px;border-radius:4px;
+  box-sizing:border-box;
+  margin-bottom:6px;
+}
+.ttb-queue-tap-row{
+  display:flex;gap:6px;align-items:center;
+  font-size:10px;color:rgba(255,255,255,0.6);
+}
+.ttb-queue-tap-btn{
+  background:rgba(176,106,245,0.12);
+  border:1px solid rgba(176,106,245,0.4);
+  color:rgba(255,255,255,0.85);
+  font-size:10px;font-family:var(--mono);letter-spacing:.1em;
+  cursor:pointer;padding:5px 10px;border-radius:4px;
+}
+.ttb-queue-tap-btn.active{
+  background:rgba(240,185,58,0.3);
+  border-color:rgba(240,185,58,0.7);
+  animation:dirty-pulse 1.5s ease-in-out infinite;
+}
+.ttb-popup.queue-tapping .ttb-trigger{
+  cursor:cell;
+}
+.ttb-popup.queue-tapping .ttb-trigger:hover{
+  filter:brightness(1.3);
+}
 </style>
+<!-- Mobiele debug-console — verwijder deze regel als alles werkt -->
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
 </head>
 <body>
 <div class="shell" id="shell" style="opacity:0;transform:translateY(8px);transition:opacity 300ms,transform 300ms">
@@ -543,6 +986,33 @@ function connect(url){
     }
     if(msg.type==='vu'){masterVu=msg.masterVu||-60;(msg.channels||[]).forEach(u=>{var c=channels.find(x=>x.index===u.index);if(c)c.vu=u.vu});updateVUs();return}
     if(msg.type==='samplerStatus'){handleSamplerStatus(msg);return}
+    if(msg.type==='sampleList'){
+      ttbAvailableSamples = msg.files || [];
+      renderFilePicker();
+      return;
+    }
+    if(msg.type==='saveSessionResult'){
+      if (msg.ok){
+        clearDirty();
+        // optionele bevestiging
+        var btn = document.getElementById('ttb-save-btn');
+        if (btn){
+          var orig = btn.textContent;
+          btn.textContent = '✓ SAVED';
+          setTimeout(function(){ btn.textContent = orig; }, 1500);
+        }
+      } else {
+        alert('Opslaan mislukt: ' + (msg.error||'onbekende fout'));
+      }
+      return;
+    }
+    if(msg.type==='sessionUpdated'){
+      // Andere browser heeft sessie gewijzigd
+      if (msg.ttb){
+        window.ttbConfig = msg.ttb;
+      }
+      return;
+    }
     var ch=channels.find(c=>c.index===msg.channel);
     if(ch){
       if(msg.type==='volume'){ch.vol=msg.value;setFP(ch.index,ch.vol)}
@@ -1219,121 +1689,572 @@ function openRecording(){
 }
 
 
-// ── TapTapBoom ──────────────────────────────────────────────────────────────
-var ttbSlots = [];           // configured slots: [{slot, file, label, vol}, ...]
-var ttbEditMode = false;     // toggled via pencil button
-var intendedStates = {};     // slot N → 'idle' | 'playing' (what user wants)
-var PRESS_THRESHOLD = 200;   // ms — shorter = one-shot, longer = gated
+// ── TapTapBoom v0.2 ──────────────────────────────────────────────────────────
+// Datastructuur volledig uit session.json (ttb sectie). Geen edit-mode;
+// sessie is source of truth. Alleen view-instellingen (slot-count, positie)
+// persisten in localStorage.
+
+var ttbSlots       = [];   // [{slot,file,label,vol,color}, ...] — uit session.json
+var ttbButtonOrder = [];   // array van slot-nummers in button-volgorde
+var ttbQueue       = [];   // array van slot-nummers in queue-volgorde
+var ttbCountOptions = [1,2,4,6,8]; // keuzes in de header-pillen
+var ttbVisibleCount = 4;    // hoeveel knoppen tegelijk zichtbaar (uit localStorage of default)
+var ttbPageIndex    = 0;    // huidige paginatie-offset in knoppen
+var ttbQueuePos     = 0;    // huidige positie in de queue (0-based)
+var ttbMasterVol    = 0.8;  // master fader-waarde
+var intendedStates  = {};   // slot N → 'idle' | 'playing'
+var PRESS_THRESHOLD = 200;  // ms drempel voor short-vs-long press
 
 function initTTB(){
-  // slots komt uit session.json (ttb.slots) via het init-bericht van de bridge
-  ttbSlots = (window.ttbConfig && Array.isArray(window.ttbConfig.slots))
-    ? window.ttbConfig.slots
-    : [];
-  ttbSlots.forEach(function(s){ if (!(s.slot in intendedStates)) intendedStates[s.slot] = 'idle'; });
-  renderTTBGrid();
+  if(!window.ttbConfig){ ttbSlots=[]; renderTTB(); return; }
+  var cfg = window.ttbConfig;
+  ttbSlots = Array.isArray(cfg.slots) ? cfg.slots : [];
+  // button_order: default is alle slots in volgorde uit ttbSlots
+  ttbButtonOrder = Array.isArray(cfg.button_order) && cfg.button_order.length
+    ? cfg.button_order.slice()
+    : ttbSlots.map(function(s){ return s.slot; });
+  // queue: optioneel
+  ttbQueue = Array.isArray(cfg.queue) ? cfg.queue.slice() : [];
+  // default_slot_count uit json, tenzij localStorage overrule
+  var savedCount = lsLoad('ttb_visible_count', null);
+  ttbVisibleCount = (savedCount!==null) ? parseInt(savedCount)
+                    : (cfg.default_slot_count || 4);
+  if (ttbCountOptions.indexOf(ttbVisibleCount) < 0) ttbVisibleCount = 4;
+  ttbPageIndex = 0;
+  ttbQueuePos  = 0;
+  // intendedStates initialiseren
+  ttbSlots.forEach(function(s){ if(!(s.slot in intendedStates)) intendedStates[s.slot] = 'idle'; });
+  renderTTB();
 }
 
-function renderTTBGrid(){
+function renderTTB(){
+  renderCountPills();
+  renderQueueNav();
+  renderGrid();
+  renderQueueDots();
+  updateFaderUI();
+  updatePageButtons();
+}
+
+function renderCountPills(){
+  var wrap = document.getElementById('ttb-count-pills');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  ttbCountOptions.forEach(function(n){
+    var b = document.createElement('button');
+    b.className = 'ttb-count-pill' + (n===ttbVisibleCount ? ' active' : '');
+    b.textContent = n;
+    b.onclick = function(){ setVisibleCount(n); };
+    wrap.appendChild(b);
+  });
+}
+
+function setVisibleCount(n){
+  ttbVisibleCount = n;
+  lsSave('ttb_visible_count', n);
+  ttbPageIndex = 0;
+  renderTTB();
+}
+
+function renderQueueNav(){
+  var nav = document.getElementById('ttb-queue-nav');
+  if(!nav) return;
+  if(ttbQueue.length===0){ nav.classList.add('hidden'); return; }
+  nav.classList.remove('hidden');
+  document.getElementById('ttb-queue-pos').textContent =
+    'cue ' + (ttbQueuePos+1) + '/' + ttbQueue.length;
+}
+
+function renderGrid(){
   var grid = document.getElementById('ttb-grid');
   if(!grid) return;
   grid.innerHTML = '';
-  ttbSlots.forEach(function(s){
-    var btn = document.createElement('button');
-    btn.className = 'ttb-trigger';
-    btn.setAttribute('data-slot', s.slot);
-    btn.innerHTML = getSlotLabel(s).replace(/\n/g,'<br>');
+  // Bereken welke slots op huidige pagina horen
+  var start = ttbPageIndex * ttbVisibleCount;
+  var end   = Math.min(start + ttbVisibleCount, ttbButtonOrder.length);
+  var cols  = Math.min(ttbVisibleCount, ttbButtonOrder.length - start);
+  if (cols < 1) cols = 1;
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
 
-    if (ttbEditMode) {
-      // In edit mode: klikken opent rename-prompt
-      btn.addEventListener('click', function(e){
-        e.preventDefault();
-        editSlotLabel(s);
-      });
-    } else {
-      // Performance mode: press/hold logic
-      var pressTime = 0;
-      var startedPlayback = false;
-
-      btn.addEventListener('pointerdown', function(e){
-        e.preventDefault();
-        pressTime = Date.now();
-        if (intendedStates[s.slot] === 'playing') {
-          // Slot speelt al: tweede tap = stop
-          send({type:'samplerStop', slot:s.slot});
-          intendedStates[s.slot] = 'idle';
-          startedPlayback = false;
-        } else {
-          send({type:'samplerPlay', slot:s.slot});
-          intendedStates[s.slot] = 'playing';
-          startedPlayback = true;
-        }
-        // Visuele flash bij press
-        btn.classList.add('flash');
-        setTimeout(function(){btn.classList.remove('flash');}, 150);
-      });
-
-      function onRelease(){
-        if (!startedPlayback) return; // we hebben geen playback gestart, niks te doen
-        var held = Date.now() - pressTime;
-        if (held >= PRESS_THRESHOLD) {
-          // Long press: stop on release (gated mode)
-          send({type:'samplerStop', slot:s.slot});
-          intendedStates[s.slot] = 'idle';
-        }
-        // Short press: laat uitspelen (one-shot)
-        startedPlayback = false;
-      }
-      btn.addEventListener('pointerup', function(e){ e.preventDefault(); onRelease(); });
-      btn.addEventListener('pointercancel', onRelease);
-      btn.addEventListener('pointerleave', function(){ /* don't trigger release on leave */ });
-    }
+  for (var i=start; i<end; i++){
+    var slotNum = ttbButtonOrder[i];
+    var s = ttbSlots.find(function(x){ return x.slot===slotNum; });
+    if (!s) continue;
+    var btn = buildTriggerButton(s);
     grid.appendChild(btn);
-  });
-  // Visuele staat (playing-indicator) opnieuw aanbrengen na render
-  ttbSlots.forEach(function(s){
-    var btn = document.querySelector('.ttb-trigger[data-slot="'+s.slot+'"]');
-    if (btn && intendedStates[s.slot] === 'playing') btn.classList.add('playing');
-  });
-}
-
-function getSlotLabel(s){
-  var override = lsLoad('ttb_label_'+s.slot, null);
-  return (override !== null && override !== '') ? override : s.label;
-}
-
-function editSlotLabel(s){
-  var current = getSlotLabel(s);
-  var next = prompt('Nieuwe naam voor slot '+s.slot+' (leeg = terug naar default):', current);
-  if (next === null) return; // cancel
-  if (next === '' || next === s.label) {
-    // Reset naar default uit session.json
-    try { localStorage.removeItem(lsKey('ttb_label_'+s.slot)); } catch(e){}
-  } else {
-    lsSave('ttb_label_'+s.slot, next);
   }
-  renderTTBGrid();
+  // queue-highlight na render
+  updateQueueHighlight();
+  // playing-state na render
+  ttbSlots.forEach(function(s){
+    var b = document.querySelector('.ttb-trigger[data-slot="'+s.slot+'"]');
+    if (b && intendedStates[s.slot]==='playing') b.classList.add('playing');
+  });
 }
 
-function toggleTTBEdit(){
-  ttbEditMode = !ttbEditMode;
-  document.getElementById('ttb-popup').classList.toggle('edit-mode', ttbEditMode);
-  document.getElementById('ttb-edit-btn').classList.toggle('active', ttbEditMode);
-  renderTTBGrid();
+function buildTriggerButton(s){
+  var btn = document.createElement('button');
+  btn.className = 'ttb-trigger';
+  btn.setAttribute('data-slot', s.slot);
+  btn.setAttribute('data-color', s.color || 'neutral');
+  btn.innerHTML = (s.label || ('slot '+s.slot)).replace(/\n/g,'<br>');
+
+  var pressTime = 0;
+  var startedPlayback = false;
+
+  btn.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    // Tijdens queue-tapping: tap registreren, niet afspelen
+    if (ttbQueueTapping){
+      recordQueueTap(s.slot);
+      btn.classList.add('flash');
+      setTimeout(function(){ btn.classList.remove('flash'); }, 150);
+      return;
+    }
+    pressTime = Date.now();
+    if (intendedStates[s.slot] === 'playing') {
+      // al bezig: tweede tap = stop
+      send({type:'samplerStop', slot:s.slot});
+      intendedStates[s.slot] = 'idle';
+      startedPlayback = false;
+    } else {
+      send({type:'samplerPlay', slot:s.slot});
+      intendedStates[s.slot] = 'playing';
+      startedPlayback = true;
+      // queue-advance: alleen als deze slot de queue-volgende is
+      if (ttbQueue.length && ttbQueue[ttbQueuePos]===s.slot) {
+        if (ttbQueuePos < ttbQueue.length - 1) ttbQueuePos++;
+        updateQueueHighlight();
+        renderQueueNav();
+        renderQueueDots();
+      }
+    }
+    btn.classList.add('flash');
+    setTimeout(function(){ btn.classList.remove('flash'); }, 150);
+  });
+
+  function onRelease(){
+    if (!startedPlayback) return;
+    var held = Date.now() - pressTime;
+    if (held >= PRESS_THRESHOLD) {
+      send({type:'samplerStop', slot:s.slot});
+      intendedStates[s.slot] = 'idle';
+    }
+    startedPlayback = false;
+  }
+  btn.addEventListener('pointerup',     function(e){ e.preventDefault(); onRelease(); });
+  btn.addEventListener('pointercancel', onRelease);
+
+  return btn;
+}
+
+function renderQueueDots(){
+  var wrap = document.getElementById('ttb-queue-dots');
+  if(!wrap) return;
+  if (ttbQueue.length===0){ wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = '';
+  ttbQueue.forEach(function(slotNum, i){
+    var dot = document.createElement('div');
+    var cls = 'ttb-queue-dot';
+    if (i < ttbQueuePos) cls += ' done';
+    else if (i === ttbQueuePos) cls += ' current';
+    dot.className = cls;
+    dot.innerHTML = '<div class="ttb-queue-dot-circle"></div>' +
+                    '<div class="ttb-queue-dot-label">'+slotNum+'</div>';
+    dot.onclick = function(){ ttbQueuePos = i; updateQueueHighlight(); renderQueueNav(); renderQueueDots(); };
+    wrap.appendChild(dot);
+  });
+}
+
+function updateQueueHighlight(){
+  // markeer de knop die huidige queue-next is
+  var highlightedSlot = (ttbQueue.length && ttbQueuePos < ttbQueue.length)
+    ? ttbQueue[ttbQueuePos]
+    : null;
+  document.querySelectorAll('.ttb-trigger').forEach(function(b){
+    if (highlightedSlot !== null && parseInt(b.getAttribute('data-slot')) === highlightedSlot) {
+      b.classList.add('queue-next');
+    } else {
+      b.classList.remove('queue-next');
+    }
+  });
+}
+
+function queueNext(){
+  if (ttbQueuePos < ttbQueue.length - 1) {
+    ttbQueuePos++;
+    updateQueueHighlight();
+    renderQueueNav();
+    renderQueueDots();
+    // Als de queue-highlight op een andere pagina valt, auto-scroll
+    ensureHighlightVisible();
+  }
+}
+function queuePrev(){
+  if (ttbQueuePos > 0) {
+    ttbQueuePos--;
+    updateQueueHighlight();
+    renderQueueNav();
+    renderQueueDots();
+    ensureHighlightVisible();
+  }
+}
+function ensureHighlightVisible(){
+  if (!ttbQueue.length) return;
+  var slotNum = ttbQueue[ttbQueuePos];
+  var idx = ttbButtonOrder.indexOf(slotNum);
+  if (idx < 0) return;
+  var page = Math.floor(idx / ttbVisibleCount);
+  if (page !== ttbPageIndex) {
+    ttbPageIndex = page;
+    renderGrid();
+    updatePageButtons();
+  }
+}
+
+function pagePrev(){
+  if (ttbPageIndex > 0) { ttbPageIndex--; renderGrid(); updatePageButtons(); }
+}
+function pageNext(){
+  var maxPage = Math.floor((ttbButtonOrder.length-1) / ttbVisibleCount);
+  if (ttbPageIndex < maxPage) { ttbPageIndex++; renderGrid(); updatePageButtons(); }
+}
+function updatePageButtons(){
+  var prev = document.getElementById('ttb-page-prev');
+  var next = document.getElementById('ttb-page-next');
+  if (!prev || !next) return;
+  var needed = ttbButtonOrder.length > ttbVisibleCount;
+  if (!needed){
+    prev.classList.add('hidden');
+    next.classList.add('hidden');
+    return;
+  }
+  prev.classList.remove('hidden');
+  next.classList.remove('hidden');
+  var maxPage = Math.floor((ttbButtonOrder.length-1) / ttbVisibleCount);
+  prev.classList.toggle('disabled', ttbPageIndex === 0);
+  next.classList.toggle('disabled', ttbPageIndex >= maxPage);
+}
+
+function updateFaderUI(){
+  var lbl = document.getElementById('ttb-fader-label');
+  var fad = document.getElementById('ttb-fader');
+  var val = document.getElementById('ttb-fader-val');
+  if (!fad) return;
+  lbl.textContent = 'MASTER';
+  fad.value = ttbMasterVol;
+  val.textContent = Math.round(ttbMasterVol * 100) + '%';
 }
 
 function handleSamplerStatus(msg){
-  // Synchroniseer intendedStates met wat Pd rapporteert — ook als de sampler
-  // extern wordt getriggerd (voetpedaal, TouchOSC, nc-commando) weet de UI
-  // wat er speelt.
   if (msg.state === 'playing' || msg.state === 'idle') {
     intendedStates[msg.slot] = msg.state;
   }
-  // Visuele indicatie op de knop (als die zichtbaar is)
   var btn = document.querySelector('.ttb-trigger[data-slot="'+msg.slot+'"]');
   if (!btn) return;
   if (msg.state === 'playing') btn.classList.add('playing');
   else btn.classList.remove('playing');
+}
+
+// Fader-listener (master volume)
+document.addEventListener('DOMContentLoaded', function(){
+  var fad = document.getElementById('ttb-fader');
+  if (fad) {
+    fad.addEventListener('input', function(){
+      ttbMasterVol = parseFloat(fad.value);
+      document.getElementById('ttb-fader-val').textContent =
+        Math.round(ttbMasterVol * 100) + '%';
+      // TODO: send({type:'samplerMasterVol', value:ttbMasterVol});
+    });
+  }
+});
+
+// ── Edit/Rec modus ──────────────────────────────────────────────────────────
+var ttbMode = 'perf';            // 'perf' | 'edit'
+var ttbActiveSlot = null;        // slotnummer van geselecteerde slot in edit
+var ttbAutotrimOn = true;
+var ttbRecording  = false;
+var sessionChannelNames = [];    // gevuld vanuit init-bericht
+var ttbDirty = false;            // onopgeslagen wijzigingen
+var ttbAvailableSamples = [];    // .wav-files in samples-map
+var ttbQueueTapping = false;     // true = tap-volgorde modus actief
+var ttbQueueTapBuffer = [];      // verzamelt tap-volgorde
+
+function markDirty(){
+  ttbDirty = true;
+  var btn = document.getElementById('ttb-save-btn');
+  if (btn){
+    btn.classList.remove('disabled');
+    btn.classList.add('dirty');
+  }
+}
+
+function clearDirty(){
+  ttbDirty = false;
+  var btn = document.getElementById('ttb-save-btn');
+  if (btn){
+    btn.classList.remove('dirty');
+    btn.classList.add('disabled');
+  }
+}
+
+function saveTTBSession(){
+  if (!ttbDirty) return;
+  // Bouw nieuwe ttb-config op uit de huidige UI-state
+  var newTTB = buildCurrentTTBConfig();
+  // Update sessieconfig op de bridge — die schrijft het naar disk
+  send({type:'saveSession', config: buildSessionWithNewTTB(newTTB)});
+}
+
+function buildCurrentTTBConfig(){
+  // Pak uit window.ttbConfig wat al was, en update met onze runtime-state
+  var base = window.ttbConfig || {};
+  return {
+    samples_dir: base.samples_dir || 'samples',
+    default_slot_count: ttbVisibleCount,
+    slots: ttbSlots,
+    button_order: ttbButtonOrder,
+    queue: ttbQueue
+  };
+}
+
+function buildSessionWithNewTTB(newTTB){
+  // window.sessionConfig kan undefined zijn — dan gebruiken we wat wel hebben.
+  // De bridge heeft de hele cfg in geheugen, maar de UI heeft alleen ttb gekregen.
+  // Daarom sturen we een merge-instructie: laat de bridge weten dat alleen ttb wijzigt.
+  // Voor nu sturen we alles wat we hebben op de UI; bridge merge't.
+  return { __ttb_only: true, ttb: newTTB };
+}
+
+function exportTTBConfig(){
+  var cfg = buildCurrentTTBConfig();
+  var json = JSON.stringify(cfg, null, 2);
+  var blob = new Blob([json], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'ttb-config-' + (sessionName||'sessie').replace(/\s+/g,'-') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importTTBConfig(event){
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var imported = JSON.parse(e.target.result);
+      // Accepteer hele config met 'ttb' key, of alleen het ttb-blok
+      var ttb = imported.ttb || imported;
+      if (!ttb.slots || !Array.isArray(ttb.slots)){
+        alert('Ongeldig TTB-config bestand (geen slots gevonden)');
+        return;
+      }
+      // Update de UI-state
+      window.ttbConfig = ttb;
+      ttbSlots = ttb.slots.slice();
+      ttbButtonOrder = Array.isArray(ttb.button_order) ? ttb.button_order.slice()
+                      : ttbSlots.map(function(s){return s.slot;});
+      ttbQueue = Array.isArray(ttb.queue) ? ttb.queue.slice() : [];
+      ttbVisibleCount = ttb.default_slot_count || 4;
+      ttbPageIndex = 0;
+      ttbQueuePos  = 0;
+      renderTTB();
+      if (ttbMode === 'edit') renderEditView();
+      markDirty();
+    } catch(err){
+      alert('Kon bestand niet inlezen: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  // Reset input zodat dezelfde file opnieuw geladen kan worden
+  event.target.value = '';
+}
+
+function toggleTTBMode(){
+  ttbMode = (ttbMode === 'perf') ? 'edit' : 'perf';
+  var pop = document.getElementById('ttb-popup');
+  pop.classList.toggle('mode-perf', ttbMode==='perf');
+  pop.classList.toggle('mode-edit', ttbMode==='edit');
+  var lbl = document.getElementById('ttb-mode-label');
+  var btn = document.getElementById('ttb-mode-toggle');
+  if (ttbMode === 'edit'){
+    lbl.textContent = 'EDIT';
+    btn.classList.add('active');
+    renderEditView();
+  } else {
+    lbl.textContent = 'PLAY';
+    btn.classList.remove('active');
+  }
+}
+
+function renderEditView(){
+  renderSlotList();
+  populateSourceDropdown();
+  renderQueueEditor();
+  // Default: eerste slot selecteren als nog geen actief is
+  if (ttbActiveSlot === null && ttbSlots.length > 0) {
+    ttbActiveSlot = ttbSlots[0].slot;
+  }
+  renderActiveSlotForm();
+}
+
+function renderSlotList(){
+  var wrap = document.getElementById('ttb-slot-list');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  // Toon alle 8 mogelijke slots, lege ook
+  var maxSlots = 8;
+  for (var i=1; i<=maxSlots; i++){
+    var s = ttbSlots.find(function(x){ return x.slot===i; });
+    var item = document.createElement('div');
+    item.className = 'ttb-slot-item' +
+      (s ? '' : ' empty') +
+      (i===ttbActiveSlot ? ' active' : '');
+    item.onclick = (function(slotNum){ return function(){
+      ttbActiveSlot = slotNum;
+      renderSlotList();
+      renderActiveSlotForm();
+    };})(i);
+    var color = s ? (s.color || 'neutral') : 'neutral';
+    item.innerHTML =
+      '<div class="ttb-slot-num">'+i+'</div>' +
+      '<div class="ttb-slot-color" style="background:rgba(176,106,245,0.5);"></div>' +
+      '<div class="ttb-slot-name">'+(s ? (s.label || 'slot '+i) : '— leeg —')+'</div>';
+    wrap.appendChild(item);
+  }
+}
+
+function populateSourceDropdown(){
+  var sel = document.getElementById('ttb-edit-source');
+  if (!sel) return;
+  sel.innerHTML = '';
+  // ch1..chN uit channels van de sessie
+  channels.forEach(function(c){
+    var o = document.createElement('option');
+    o.value = 'ch' + c.index;
+    o.textContent = 'ch' + c.index + ' — ' + (c.name || '');
+    sel.appendChild(o);
+  });
+  var oM = document.createElement('option');
+  oM.value = 'master'; oM.textContent = 'master';
+  sel.appendChild(oM);
+}
+
+function renderActiveSlotForm(){
+  if (ttbActiveSlot === null) return;
+  var s = ttbSlots.find(function(x){ return x.slot===ttbActiveSlot; });
+  // Label
+  var labelInput = document.getElementById('ttb-edit-label');
+  labelInput.value = s ? (s.label || '') : '';
+  labelInput.oninput = function(){
+    if (s) s.label = labelInput.value;
+    renderSlotList();
+    if (ttbMode === 'perf') renderGrid();
+    markDirty();
+  };
+  // Kleur-swatches
+  var currentColor = s ? (s.color || 'neutral') : 'neutral';
+  document.querySelectorAll('#ttb-edit-colors .ttb-color-swatch').forEach(function(sw){
+    sw.classList.toggle('selected', sw.getAttribute('data-color')===currentColor);
+    sw.onclick = function(){
+      var c = sw.getAttribute('data-color');
+      if (s) s.color = c;
+      renderSlotList();
+      renderActiveSlotForm();
+      markDirty();
+    };
+  });
+  // Volume
+  var vol = s ? (typeof s.vol==='number' ? s.vol : 0.8) : 0.8;
+  var volRange = document.getElementById('ttb-edit-vol');
+  var volVal   = document.getElementById('ttb-edit-vol-val');
+  volRange.value = vol;
+  volVal.textContent = Math.round(vol * 100) + '%';
+  volRange.oninput = function(){
+    var v = parseFloat(volRange.value);
+    if (s) s.vol = v;
+    volVal.textContent = Math.round(v * 100) + '%';
+    send({type:'samplerVol', slot:ttbActiveSlot, value:v});
+    markDirty();
+  };
+  // Bestand
+  document.getElementById('ttb-edit-file').value = s ? (s.file || '') : '(leeg)';
+  // Source dropdown
+  document.getElementById('ttb-edit-source').value =
+    (s && s.source) ? s.source : 'ch1';
+  // Speed
+  var speedRange = document.getElementById('ttb-edit-speed');
+  var speedVal   = document.getElementById('ttb-edit-speed-val');
+  var sp = (s && typeof s.speed==='number') ? s.speed : 1.0;
+  speedRange.value = sp;
+  speedVal.textContent = sp.toFixed(2) + 'x';
+  speedRange.oninput = function(){
+    var v = parseFloat(speedRange.value);
+    if (s) s.speed = v;
+    speedVal.textContent = v.toFixed(2) + 'x';
+    send({type:'samplerSpeed', slot:ttbActiveSlot, value:v});
+  };
+  // Autotrim threshold
+  var threshRange = document.getElementById('ttb-edit-thresh');
+  var threshVal   = document.getElementById('ttb-edit-thresh-val');
+  threshRange.value = (s && s.autotrimThreshold!=null) ? s.autotrimThreshold : -40;
+  threshVal.textContent = threshRange.value + ' dB';
+  threshRange.oninput = function(){
+    var v = parseInt(threshRange.value);
+    if (s) s.autotrimThreshold = v;
+    threshVal.textContent = v + ' dB';
+    send({type:'samplerAutotrimThreshold', slot:ttbActiveSlot, value:v});
+  };
+  // Autotrim preroll
+  var preRange = document.getElementById('ttb-edit-preroll');
+  var preVal   = document.getElementById('ttb-edit-preroll-val');
+  preRange.value = (s && s.autotrimPreroll!=null) ? s.autotrimPreroll : 50;
+  preVal.textContent = preRange.value + ' ms';
+  preRange.oninput = function(){
+    var v = parseInt(preRange.value);
+    if (s) s.autotrimPreroll = v;
+    preVal.textContent = v + ' ms';
+    send({type:'samplerAutotrimPreroll', slot:ttbActiveSlot, value:v});
+  };
+}
+
+function toggleAutotrim(){
+  ttbAutotrimOn = !ttbAutotrimOn;
+  document.getElementById('ttb-edit-autotrim').classList.toggle('checked', ttbAutotrimOn);
+  document.getElementById('ttb-edit-autotrim-thresh').style.opacity = ttbAutotrimOn ? '1' : '0.4';
+  document.getElementById('ttb-edit-autotrim-pre').style.opacity    = ttbAutotrimOn ? '1' : '0.4';
+}
+
+function editPlay(){
+  if (ttbActiveSlot === null) return;
+  send({type:'samplerPlay', slot:ttbActiveSlot});
+}
+
+function editRec(){
+  if (ttbActiveSlot === null) return;
+  var src = document.getElementById('ttb-edit-source').value;
+  if (!ttbRecording){
+    // Start opname
+    send({type:'samplerRouterInput', slot:ttbActiveSlot, source:src});
+    if (ttbAutotrimOn) {
+      send({type:'samplerAutotrim', slot:ttbActiveSlot});
+    }
+    send({type:'samplerRecStart', slot:ttbActiveSlot});
+    ttbRecording = true;
+    document.getElementById('ttb-btn-rec').classList.add('active');
+    document.getElementById('ttb-btn-rec').innerHTML = '■ STOP';
+  } else {
+    // Stop opname
+    send({type:'samplerRecStop', slot:ttbActiveSlot});
+    ttbRecording = false;
+    document.getElementById('ttb-btn-rec').classList.remove('active');
+    document.getElementById('ttb-btn-rec').innerHTML = '● REC';
+  }
 }
 
 function openTTB(){
@@ -1342,7 +2263,136 @@ function openTTB(){
 }
 
 function closeTTB(){
+  if (ttbDirty){
+    var ok = confirm('Er zijn onopgeslagen wijzigingen. Toch sluiten?');
+    if (!ok) return;
+  }
   document.getElementById('ttb-popup').classList.add('hidden');
+}
+
+// ── File-picker ─────────────────────────────────────────────────────────────
+function openFilePicker(){
+  if (ttbActiveSlot === null) return;
+  // Vraag bridge om actuele lijst van .wav-bestanden
+  send({type:'listSamples'});
+  document.getElementById('ttb-filepicker').classList.add('visible');
+  // Render alvast met cached lijst (komt later met fresh data binnen)
+  renderFilePicker();
+}
+
+function closeFilePicker(){
+  document.getElementById('ttb-filepicker').classList.remove('visible');
+}
+
+function renderFilePicker(){
+  var list = document.getElementById('ttb-filepicker-list');
+  if (!list) return;
+  list.innerHTML = '';
+  var s = ttbSlots.find(function(x){ return x.slot===ttbActiveSlot; });
+  var currentFile = s ? s.file : null;
+  if (ttbAvailableSamples.length === 0){
+    var item = document.createElement('div');
+    item.className = 'ttb-filepicker-item empty';
+    item.textContent = '— geen .wav bestanden in samples-map —';
+    list.appendChild(item);
+    return;
+  }
+  ttbAvailableSamples.forEach(function(filename){
+    var item = document.createElement('div');
+    item.className = 'ttb-filepicker-item' + (filename===currentFile ? ' current' : '');
+    item.textContent = filename;
+    item.onclick = function(){ selectSampleFile(filename); };
+    list.appendChild(item);
+  });
+}
+
+function selectSampleFile(filename){
+  if (ttbActiveSlot === null) return;
+  var s = ttbSlots.find(function(x){ return x.slot===ttbActiveSlot; });
+  if (!s){
+    // Slot bestaat nog niet — nieuwe entry maken
+    s = { slot: ttbActiveSlot, file: filename, label: 'SLOT ' + ttbActiveSlot, vol: 0.8, color: 'neutral' };
+    ttbSlots.push(s);
+    if (ttbButtonOrder.indexOf(ttbActiveSlot) === -1) ttbButtonOrder.push(ttbActiveSlot);
+  } else {
+    s.file = filename;
+  }
+  // Stuur load-commando naar Pd
+  var samplesDir = (window.ttbConfig && window.ttbConfig.samples_dir) || 'samples';
+  var fullPath = samplesDir + '/' + filename;
+  send({type:'samplerLoad', slot:ttbActiveSlot, path:fullPath});
+  closeFilePicker();
+  renderEditView();
+  if (ttbMode === 'perf') renderGrid();
+  markDirty();
+}
+
+// ── Queue-editor ────────────────────────────────────────────────────────────
+function onQueueInput(){
+  var input = document.getElementById('ttb-queue-input');
+  var raw = input.value;
+  // Parse: getallen gescheiden door komma's
+  var parts = raw.split(',').map(function(p){return parseInt(p.trim());}).filter(function(n){return !isNaN(n) && n>=1 && n<=8;});
+  ttbQueue = parts;
+  ttbQueuePos = 0;
+  // Re-render queue-elementen
+  renderQueueNav();
+  renderQueueDots();
+  updateQueueHighlight();
+  markDirty();
+}
+
+function renderQueueEditor(){
+  var input = document.getElementById('ttb-queue-input');
+  if (input) input.value = ttbQueue.join(', ');
+}
+
+function toggleQueueTapping(){
+  ttbQueueTapping = !ttbQueueTapping;
+  var btn = document.getElementById('ttb-queue-tap-btn');
+  var hint = document.getElementById('ttb-queue-tap-hint');
+  var pop = document.getElementById('ttb-popup');
+  pop.classList.toggle('queue-tapping', ttbQueueTapping);
+  if (ttbQueueTapping){
+    ttbQueueTapBuffer = [];
+    btn.classList.add('active');
+    btn.textContent = '■ KLAAR ('+ttbQueueTapBuffer.length+')';
+    hint.textContent = 'tap nu de cue-knoppen in volgorde';
+    // Switch naar perf-mode zodat de knoppen tikbaar zijn
+    if (ttbMode === 'edit'){
+      // We blijven in edit-mode maar interactief in linker kolom — gebruik de slot-list
+      // als tap-targets. Maar simpeler: switch tijdelijk naar perf-mode.
+      ttbModeBeforeTapping = ttbMode;
+      toggleTTBMode();
+    }
+  } else {
+    // Klaar — verwerk buffer
+    btn.classList.remove('active');
+    btn.textContent = '▶ TAP VOLGORDE';
+    hint.textContent = '— of typ slots gescheiden door komma\'s';
+    if (ttbQueueTapBuffer.length > 0){
+      ttbQueue = ttbQueueTapBuffer.slice();
+      ttbQueuePos = 0;
+      renderQueueEditor();
+      renderQueueNav();
+      renderQueueDots();
+      updateQueueHighlight();
+      markDirty();
+    }
+    // Switch terug naar edit-mode als we daarvandaan kwamen
+    if (typeof ttbModeBeforeTapping !== 'undefined' && ttbModeBeforeTapping === 'edit' && ttbMode === 'perf'){
+      toggleTTBMode();
+    }
+    ttbModeBeforeTapping = undefined;
+  }
+}
+var ttbModeBeforeTapping;
+
+// Wordt door buildTriggerButton aangeroepen ipv normaal afspelen tijdens queue-tapping
+function recordQueueTap(slotNum){
+  ttbQueueTapBuffer.push(slotNum);
+  var btn = document.getElementById('ttb-queue-tap-btn');
+  if (btn) btn.textContent = '■ KLAAR ('+ttbQueueTapBuffer.length+')';
 }
 
 // TTB sluit alleen via X knop
@@ -1404,20 +2454,136 @@ function closeTTB(){
   <div class="knob-popup-val" id="popup-val" title="dubbelklik = reset">C</div>
 </div>
 
-<!-- TTB Popup -->
-<div class="ttb-popup hidden" id="ttb-popup">
+<!-- TTB Popup v0.2 -->
+<div class="ttb-popup mode-perf hidden" id="ttb-popup">
   <div class="ttb-popup-header" id="ttb-header">
     <div class="ttb-popup-title">TAP TAP BOOM</div>
-    <div style="display:flex;align-items:center;gap:0">
-      <button class="ttb-edit-btn" id="ttb-edit-btn" onclick="toggleTTBEdit()" title="Hernoem slots">&#x270E;</button>
+    <div class="ttb-header-controls">
+      <button class="ttb-mode-toggle" id="ttb-mode-toggle" onclick="toggleTTBMode()">
+        <span id="ttb-mode-label">PLAY</span>
+      </button>
+      <button class="ttb-edit-action disabled" id="ttb-save-btn" onclick="saveTTBSession()" title="Opslaan">SAVE</button>
+      <button class="ttb-edit-action" id="ttb-export-btn" onclick="exportTTBConfig()" title="Exporteer ttb-config">EXPORT</button>
+      <button class="ttb-edit-action" id="ttb-import-btn" onclick="document.getElementById('ttb-import-file').click()" title="Importeer ttb-config">IMPORT</button>
+      <input type="file" id="ttb-import-file" accept=".json" style="display:none" onchange="importTTBConfig(event)">
+      <div class="ttb-count-pills" id="ttb-count-pills">
+        <!-- pillen worden dynamisch gevuld -->
+      </div>
+      <div class="ttb-queue-nav hidden" id="ttb-queue-nav">
+        <button class="ttb-queue-arrow" onclick="queuePrev()">&#x25C2;</button>
+        <span class="ttb-queue-pos" id="ttb-queue-pos">cue 0/0</span>
+        <button class="ttb-queue-arrow" onclick="queueNext()">&#x25B8;</button>
+      </div>
       <button class="ttb-close" onclick="closeTTB()">&#x2715;</button>
     </div>
   </div>
   <div class="ttb-body">
-    <div class="ttb-section-label">TRIGGERS</div>
-    <div class="ttb-grid" id="ttb-grid">
-      <!-- Gevuld door JS -->
+    <div class="ttb-grid-wrap">
+      <button class="ttb-page-btn" id="ttb-page-prev" onclick="pagePrev()">&#x25C2;</button>
+      <div class="ttb-grid" id="ttb-grid">
+        <!-- trigger-knoppen worden dynamisch gerenderd -->
+      </div>
+      <button class="ttb-page-btn" id="ttb-page-next" onclick="pageNext()">&#x25B8;</button>
     </div>
+    <div class="ttb-queue-dots hidden" id="ttb-queue-dots">
+      <!-- queue-dots worden dynamisch gevuld -->
+    </div>
+    <div class="ttb-fader-wrap">
+      <div class="ttb-fader-label" id="ttb-fader-label">MASTER</div>
+      <input type="range" class="ttb-fader" id="ttb-fader" min="0" max="1" step="0.01" value="0.8">
+      <div class="ttb-fader-val" id="ttb-fader-val">80%</div>
+    </div>
+  </div>
+  <!-- Edit/Rec body — alleen zichtbaar in edit-modus -->
+  <div class="ttb-edit-body" id="ttb-edit-body">
+    <!-- Linker kolom: slot lijst -->
+    <div class="ttb-edit-col">
+      <div class="ttb-edit-col-title">SLOTS</div>
+      <div class="ttb-slot-list" id="ttb-slot-list"></div>
+    </div>
+    <!-- Midden kolom: waveform + transport -->
+    <div class="ttb-edit-col">
+      <div class="ttb-edit-col-title">SAMPLE</div>
+      <div class="ttb-wave-area" id="ttb-wave-area">
+        <div class="ttb-wave-empty" id="ttb-wave-empty">— geen sample geselecteerd —</div>
+      </div>
+      <div class="ttb-transport">
+        <button class="ttb-trans-btn" id="ttb-btn-play" onclick="editPlay()">▶ PLAY</button>
+        <button class="ttb-trans-btn rec" id="ttb-btn-rec" onclick="editRec()">● REC</button>
+      </div>
+      <div class="ttb-edit-row">
+        <label>Source</label>
+        <select id="ttb-edit-source"></select>
+      </div>
+      <div class="ttb-edit-row">
+        <label>Speed</label>
+        <input type="range" id="ttb-edit-speed" min="0.25" max="4" step="0.05" value="1">
+        <div class="ttb-edit-val" id="ttb-edit-speed-val">1.00x</div>
+      </div>
+      <div class="ttb-edit-row">
+        <label>Autotrim</label>
+        <div class="ttb-checkbox checked" id="ttb-edit-autotrim" onclick="toggleAutotrim()"></div>
+      </div>
+      <div class="ttb-edit-row" id="ttb-edit-autotrim-thresh">
+        <label>&nbsp;&nbsp;Threshold</label>
+        <input type="range" id="ttb-edit-thresh" min="-80" max="0" step="1" value="-40">
+        <div class="ttb-edit-val" id="ttb-edit-thresh-val">-40 dB</div>
+      </div>
+      <div class="ttb-edit-row" id="ttb-edit-autotrim-pre">
+        <label>&nbsp;&nbsp;Preroll</label>
+        <input type="range" id="ttb-edit-preroll" min="0" max="500" step="10" value="50">
+        <div class="ttb-edit-val" id="ttb-edit-preroll-val">50 ms</div>
+      </div>
+      <!-- Queue-editor (sessie-breed, niet per slot) -->
+      <div class="ttb-queue-editor">
+        <div class="ttb-queue-editor-title">QUEUE — VOLGORDE VAN CUES</div>
+        <input type="text" id="ttb-queue-input" placeholder="bv: 1, 5, 1, 5, 1" oninput="onQueueInput()">
+        <div class="ttb-queue-tap-row">
+          <button class="ttb-queue-tap-btn" id="ttb-queue-tap-btn" onclick="toggleQueueTapping()">▶ TAP VOLGORDE</button>
+          <span id="ttb-queue-tap-hint">— of typ slots gescheiden door komma's</span>
+        </div>
+      </div>
+    </div>
+    <!-- Rechter kolom: slot-instellingen -->
+    <div class="ttb-edit-col">
+      <div class="ttb-edit-col-title">SLOT INFO</div>
+      <div class="ttb-edit-row" style="flex-direction:column;align-items:stretch;gap:4px;">
+        <label>Label</label>
+        <input type="text" id="ttb-edit-label" placeholder="naam van slot">
+      </div>
+      <div class="ttb-edit-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+        <label>Kleur</label>
+        <div class="ttb-color-palette" id="ttb-edit-colors">
+          <div class="ttb-color-swatch" data-color="neutral"></div>
+          <div class="ttb-color-swatch" data-color="purple"></div>
+          <div class="ttb-color-swatch" data-color="green"></div>
+          <div class="ttb-color-swatch" data-color="lime"></div>
+          <div class="ttb-color-swatch" data-color="gold"></div>
+          <div class="ttb-color-swatch" data-color="orange"></div>
+          <div class="ttb-color-swatch" data-color="red"></div>
+          <div class="ttb-color-swatch" data-color="magenta"></div>
+          <div class="ttb-color-swatch" data-color="blue"></div>
+          <div class="ttb-color-swatch" data-color="cyan"></div>
+        </div>
+      </div>
+      <div class="ttb-edit-row">
+        <label>Volume</label>
+        <input type="range" id="ttb-edit-vol" min="0" max="1" step="0.01" value="0.8">
+        <div class="ttb-edit-val" id="ttb-edit-vol-val">80%</div>
+      </div>
+      <div class="ttb-edit-row" style="flex-direction:column;align-items:stretch;gap:4px;">
+        <label>Bestand</label>
+        <input type="text" id="ttb-edit-file" class="clickable" readonly placeholder="(klik om te kiezen)" onclick="openFilePicker()">
+      </div>
+    </div>
+  </div>
+  <!-- File-picker overlay (zit binnen popup, edge-to-edge) -->
+  <div class="ttb-filepicker" id="ttb-filepicker">
+    <div class="ttb-filepicker-title">
+      <span>KIES SAMPLE</span>
+      <button class="ttb-close" onclick="closeFilePicker()">&#x2715;</button>
+    </div>
+    <div class="ttb-filepicker-list" id="ttb-filepicker-list"></div>
   </div>
 </div>
 </body>

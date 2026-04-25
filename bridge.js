@@ -12,7 +12,38 @@ const { WebSocketServer } = require("ws");
 
 // ─── Config laden ──────────────────────────────────────────────────────────
 const configPath = process.argv[2] || "session.json";
-const cfg        = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const SESSIONS_DIR = path.join(path.dirname(path.resolve(configPath)), "sessions");
+
+// Eerst de verse session.json (TERMINAL-default of handmatige) inlezen om de
+// sessienaam te bepalen. Dan kijken of er een lokale werkversie bestaat onder
+// sessions/<sessienaam>.json — die wint.
+function loadSessionAtStartup() {
+  var raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  var sname = raw.session_name || raw.session || path.basename(configPath, ".json");
+  var workPath = path.join(SESSIONS_DIR, sanitizeSessionName(sname) + ".json");
+  if (fs.existsSync(workPath)) {
+    try {
+      var work = JSON.parse(fs.readFileSync(workPath, "utf8"));
+      // Werkversie schrijven naar session.json zodat alles ervan uitgaat.
+      var tmp = configPath + ".tmp";
+      fs.writeFileSync(tmp, JSON.stringify(work, null, 2), "utf8");
+      fs.renameSync(tmp, configPath);
+      console.log(`↺  Lokale werkversie geladen uit sessions/${sanitizeSessionName(sname)}.json`);
+      return work;
+    } catch (err) {
+      console.warn(`⚠  Werkversie lezen mislukt, val terug op default: ${err.message}`);
+    }
+  } else {
+    console.log(`◦  Geen lokale werkversie voor "${sname}" — TERMINAL-default in gebruik`);
+  }
+  return raw;
+}
+
+function sanitizeSessionName(name) {
+  return String(name).trim().replace(/[\/\\:*?"<>|]/g, "_").replace(/\s+/g, "-");
+}
+
+const cfg = loadSessionAtStartup();
 
 const sessionName    = cfg.session_name || cfg.session || path.basename(configPath, ".json");
 const PD_FUDI_PORT   = cfg.osc_receive_port || 9000;
@@ -30,8 +61,9 @@ const SAMPLER_FUDI    = SAMPLER_CFG.fudi_port   || 9002;
 const SAMPLER_STAT    = SAMPLER_CFG.status_port || 9003;
 const SAMPLER_SLOTS   = SAMPLER_CFG.slots       || 8;
 
-// Zorg dat recordings map bestaat
+// Zorg dat recordings map en sessions-archief bestaan
 if (!fs.existsSync(REC_DIR)) fs.mkdirSync(REC_DIR, { recursive: true });
+if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR, { recursive: true });
 
 // ─── State ─────────────────────────────────────────────────────────────────
 const state = {};
@@ -283,7 +315,13 @@ wss.on("connection", ws => {
     ttb: cfg.ttb || null,
     sampler: SAMPLER_ENABLED ? { enabled: true, slots: Object.values(samplerState) } : null,
   }));
-  ws.on("message", raw => { try { handleFrontendMessage(JSON.parse(raw)); } catch {} });
+  ws.on("message", raw => {
+    try {
+      handleFrontendMessage(JSON.parse(raw), ws);
+    } catch (err) {
+      console.warn(`⚠  Bericht-afhandeling: ${err.message}`);
+    }
+  });
   ws.on("close", () => { wsClients.delete(ws); console.log(`-  Frontend verbroken (${wsClients.size} clients)`); });
 });
 
@@ -297,7 +335,7 @@ function broadcastVU() {
 }
 
 // ─── Frontend berichten ─────────────────────────────────────────────────────
-function handleFrontendMessage(msg) {
+function handleFrontendMessage(msg, ws) {
   const { type, channel, value } = msg;
   switch (type) {
     // Mixer kanalen
@@ -373,6 +411,21 @@ function handleFrontendMessage(msg) {
       broadcast({ type: "samplerAutotrimPreroll", slot: msg.slot, value: msg.value });
       break;
     }
+    // Sessie-config opslaan (musici-edits naar disk)
+    case "saveSession": {
+      saveSessionToDisk(msg.config, ws);
+      break;
+    }
+    // Sample-bestanden in samples-map opvragen
+    case "listSamples": {
+      var files = listSampleFiles();
+      console.log(`✓  listSamples: ${files.length} bestand(en) gevonden`);
+      if (ws) ws.send(JSON.stringify({
+        type: "sampleList",
+        files: files,
+      }));
+      break;
+    }
     default: console.warn("Onbekend bericht type:", type);
   }
 }
@@ -383,6 +436,63 @@ function updateAllGates() {
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
+// ─── Sessie-config schrijven en samples lijsten ────────────────────────────
+// Atomic write: eerst naar tijdelijk bestand, dan rename. Voorkomt corrupte
+// session.json als het schrijven onderbroken wordt.
+function saveSessionToDisk(newConfig, ws) {
+  if (!newConfig || typeof newConfig !== "object") {
+    if (ws) ws.send(JSON.stringify({type:"saveSessionResult", ok:false, error:"invalid config"}));
+    return;
+  }
+  try {
+    // Als de UI alleen het ttb-deel stuurt (__ttb_only flag), merge dat in cfg
+    var fullConfig;
+    if (newConfig.__ttb_only && newConfig.ttb) {
+      fullConfig = JSON.parse(JSON.stringify(cfg));
+      fullConfig.ttb = newConfig.ttb;
+    } else {
+      fullConfig = newConfig;
+    }
+    // 1. Schrijf naar de actieve session.json (atomic via .tmp + rename)
+    var tmp = configPath + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(fullConfig, null, 2), "utf8");
+    fs.renameSync(tmp, configPath);
+    // 2. Schrijf óók een kopie naar sessions/<sessienaam>.json (lokaal werkarchief)
+    var sname = fullConfig.session_name || fullConfig.session || sessionName;
+    var workPath = path.join(SESSIONS_DIR, sanitizeSessionName(sname) + ".json");
+    var workTmp  = workPath + ".tmp";
+    fs.writeFileSync(workTmp, JSON.stringify(fullConfig, null, 2), "utf8");
+    fs.renameSync(workTmp, workPath);
+    // Update onze in-memory cfg en TTB-state
+    Object.keys(cfg).forEach(k => delete cfg[k]);
+    Object.assign(cfg, fullConfig);
+    console.log(`✓  Sessie opgeslagen naar ${configPath} + sessions/${sanitizeSessionName(sname)}.json`);
+    // Herlaad TTB-samples in Pd op basis van nieuwe config
+    if (SAMPLER_ENABLED) loadTTBSamples();
+    // Bevestig naar afzender, en broadcast naar andere clients
+    if (ws) ws.send(JSON.stringify({type:"saveSessionResult", ok:true}));
+    broadcast({type:"sessionUpdated", ttb: cfg.ttb || null});
+  } catch (err) {
+    console.warn(`⚠  Sessie opslaan mislukt: ${err.message}`);
+    if (ws) ws.send(JSON.stringify({type:"saveSessionResult", ok:false, error:err.message}));
+  }
+}
+
+function listSampleFiles() {
+  var samplesDir = cfg.ttb && cfg.ttb.samples_dir ? cfg.ttb.samples_dir : "samples";
+  // Pad relatief tot bridge-werkmap
+  var fullDir = path.isAbsolute(samplesDir) ? samplesDir : path.join(process.cwd(), samplesDir);
+  if (!fs.existsSync(fullDir)) return [];
+  try {
+    return fs.readdirSync(fullDir)
+      .filter(f => /\.(wav|aif|aiff)$/i.test(f))
+      .sort();
+  } catch (err) {
+    console.warn(`⚠  Sample-lijst lezen mislukt: ${err.message}`);
+    return [];
+  }
+}
+
 // ─── Start ─────────────────────────────────────────────────────────────────
 httpServer.listen(WS_PORT, () => {
   console.log("TouchLab Mixer Bridge");
@@ -391,6 +501,11 @@ httpServer.listen(WS_PORT, () => {
   console.log(`WebSocket:  ws://localhost:${WS_PORT}`);
   console.log(`Downloads:  http://localhost:${WS_PORT}/recordings`);
   console.log(`Opnames in: ${REC_DIR}`);
+  // Tel werkversies in archief
+  try {
+    var workCount = fs.readdirSync(SESSIONS_DIR).filter(f => /\.json$/.test(f)).length;
+    console.log(`Sessies:    ${workCount} werkversie(s) in ${path.relative(process.cwd(), SESSIONS_DIR) || 'sessions'}/`);
+  } catch (e) {}
   if (SAMPLER_ENABLED) {
     console.log(`Sampler:    ${SAMPLER_SLOTS} slots · cmd→UDP ${SAMPLER_FUDI} · status←UDP ${SAMPLER_STAT}`);
   } else {
