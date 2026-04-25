@@ -498,17 +498,29 @@ html,body{
   /* Hogere preset voor edit-modus */
   min-height:480px;
 }
-/* Mode-toggle knop in header */
-.ttb-mode-toggle{
-  background:rgba(176,106,245,0.1);border:1px solid rgba(176,106,245,0.3);
-  border-radius:4px;color:rgba(176,106,245,0.85);
-  font-size:10px;font-family:var(--mono);letter-spacing:.1em;
-  cursor:pointer;padding:3px 9px;line-height:1;flex-shrink:0;
-  display:flex;align-items:center;gap:4px;
+/* Mode-toggle als twin-button (PLAY | EDIT) */
+.ttb-mode-twin{
+  display:flex;
+  border-radius:4px;overflow:hidden;
+  border:1px solid rgba(176,106,245,0.3);
+  flex-shrink:0;
 }
-.ttb-mode-toggle.active{
-  background:rgba(240,185,58,0.25);border-color:rgba(240,185,58,0.6);
+.ttb-mode-half{
+  background:rgba(176,106,245,0.05);
+  color:rgba(176,106,245,0.5);
+  font-size:10px;font-family:var(--mono);letter-spacing:.1em;
+  cursor:pointer;padding:3px 9px;line-height:1;
+  border:0;
+  transition:all .15s;
+}
+.ttb-mode-half:not(.active):hover{
+  background:rgba(176,106,245,0.15);
+  color:rgba(176,106,245,0.9);
+}
+.ttb-mode-half.active{
+  background:rgba(240,185,58,0.3);
   color:rgba(255,255,255,0.95);
+  cursor:default;
 }
 /* Edit-mode action buttons */
 .ttb-edit-action{
@@ -1965,7 +1977,7 @@ document.addEventListener('DOMContentLoaded', function(){
       ttbMasterVol = parseFloat(fad.value);
       document.getElementById('ttb-fader-val').textContent =
         Math.round(ttbMasterVol * 100) + '%';
-      // TODO: send({type:'samplerMasterVol', value:ttbMasterVol});
+      send({type:'samplerMasterVol', value:ttbMasterVol});
     });
   }
 });
@@ -2028,13 +2040,19 @@ function buildSessionWithNewTTB(newTTB){
 }
 
 function exportTTBConfig(){
+  var defaultName = 'ttb-' + (sessionName||'sessie').replace(/\s+/g,'-');
+  var name = prompt('Naam voor de export (zonder .json):', defaultName);
+  if (!name) return; // cancelled or empty
+  // Strip .json als gebruiker het toch typte
+  name = name.replace(/\.json$/i, '').trim();
+  if (!name) return;
   var cfg = buildCurrentTTBConfig();
   var json = JSON.stringify(cfg, null, 2);
   var blob = new Blob([json], {type:'application/json'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'ttb-config-' + (sessionName||'sessie').replace(/\s+/g,'-') + '.json';
+  a.download = name + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2075,21 +2093,23 @@ function importTTBConfig(event){
   event.target.value = '';
 }
 
-function toggleTTBMode(){
-  ttbMode = (ttbMode === 'perf') ? 'edit' : 'perf';
+function setTTBMode(newMode){
+  if (newMode === ttbMode) return;
+  ttbMode = newMode;
   var pop = document.getElementById('ttb-popup');
   pop.classList.toggle('mode-perf', ttbMode==='perf');
   pop.classList.toggle('mode-edit', ttbMode==='edit');
-  var lbl = document.getElementById('ttb-mode-label');
-  var btn = document.getElementById('ttb-mode-toggle');
-  if (ttbMode === 'edit'){
-    lbl.textContent = 'EDIT';
-    btn.classList.add('active');
-    renderEditView();
-  } else {
-    lbl.textContent = 'PLAY';
-    btn.classList.remove('active');
-  }
+  // Update twin-button highlights
+  var btnPlay = document.getElementById('ttb-mode-play');
+  var btnEdit = document.getElementById('ttb-mode-edit');
+  if (btnPlay) btnPlay.classList.toggle('active', ttbMode==='perf');
+  if (btnEdit) btnEdit.classList.toggle('active', ttbMode==='edit');
+  if (ttbMode === 'edit') renderEditView();
+}
+
+// Backwards-compat — sommige flows roepen toggleTTBMode aan
+function toggleTTBMode(){
+  setTTBMode(ttbMode === 'perf' ? 'edit' : 'perf');
 }
 
 function renderEditView(){
@@ -2164,8 +2184,13 @@ function renderActiveSlotForm(){
     sw.onclick = function(){
       var c = sw.getAttribute('data-color');
       if (s) s.color = c;
+      // Highlight bijwerken zonder hele form opnieuw te tekenen
+      // (dat zou label-input legen die net gewijzigd kan zijn)
+      document.querySelectorAll('#ttb-edit-colors .ttb-color-swatch').forEach(function(sw2){
+        sw2.classList.toggle('selected', sw2.getAttribute('data-color')===c);
+      });
       renderSlotList();
-      renderActiveSlotForm();
+      if (ttbMode === 'perf') renderGrid();
       markDirty();
     };
   });
@@ -2459,12 +2484,13 @@ function recordQueueTap(slotNum){
   <div class="ttb-popup-header" id="ttb-header">
     <div class="ttb-popup-title">TAP TAP BOOM</div>
     <div class="ttb-header-controls">
-      <button class="ttb-mode-toggle" id="ttb-mode-toggle" onclick="toggleTTBMode()">
-        <span id="ttb-mode-label">PLAY</span>
-      </button>
+      <div class="ttb-mode-twin">
+        <button class="ttb-mode-half active" id="ttb-mode-play" onclick="setTTBMode('perf')">PLAY</button>
+        <button class="ttb-mode-half" id="ttb-mode-edit" onclick="setTTBMode('edit')">EDIT</button>
+      </div>
       <button class="ttb-edit-action disabled" id="ttb-save-btn" onclick="saveTTBSession()" title="Opslaan">SAVE</button>
-      <button class="ttb-edit-action" id="ttb-export-btn" onclick="exportTTBConfig()" title="Exporteer ttb-config">EXPORT</button>
-      <button class="ttb-edit-action" id="ttb-import-btn" onclick="document.getElementById('ttb-import-file').click()" title="Importeer ttb-config">IMPORT</button>
+      <button class="ttb-edit-action" id="ttb-export-btn" onclick="exportTTBConfig()" title="Exporteer config als bestand">EXPORT AS</button>
+      <button class="ttb-edit-action" id="ttb-import-btn" onclick="document.getElementById('ttb-import-file').click()" title="Laad een eerder opgeslagen config-file">LOAD</button>
       <input type="file" id="ttb-import-file" accept=".json" style="display:none" onchange="importTTBConfig(event)">
       <div class="ttb-count-pills" id="ttb-count-pills">
         <!-- pillen worden dynamisch gevuld -->

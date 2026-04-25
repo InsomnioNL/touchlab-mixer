@@ -4,7 +4,7 @@
 #X obj 20 80 netreceive -u -b 9002;
 #X obj 20 110 fudiparse;
 #X obj 280 110 print fudi-raw;
-#X obj 20 150 route sampler-load sampler-play sampler-stop sampler-vol sampler-speed sampler-rec-start sampler-rec-stop sampler-trim sampler-trim-end sampler-autotrim sampler-autotrim-threshold sampler-autotrim-preroll sampler-router-input;
+#X obj 20 150 route sampler-load sampler-play sampler-stop sampler-vol sampler-speed sampler-rec-start sampler-rec-stop sampler-trim sampler-trim-end sampler-autotrim sampler-autotrim-threshold sampler-autotrim-preroll sampler-router-input sampler-master-vol;
 #X obj 20 190 s sampler-load;
 #X obj 140 190 s sampler-play;
 #X obj 260 190 s sampler-stop;
@@ -18,6 +18,7 @@
 #X obj 500 220 s sampler-autotrim-threshold;
 #X obj 760 220 s sampler-autotrim-preroll;
 #X obj 20 250 s sampler-router-input;
+#X obj 200 250 s sampler-master-vol;
 #X obj 20 290 print unknown-fudi;
 #X obj 20 340 r sampler-status-out;
 #X obj 20 365 netsend 1;
@@ -25,6 +26,9 @@
 #X obj 20 445 t b b;
 #X msg 20 480 connect 127.0.0.1 9003;
 #X msg 180 480 \; pd dsp 1;
+#X obj 20 540 loadbang;
+#X msg 20 565 1;
+#X obj 20 590 s sampler-master-vol;
 #X obj 900 80 sampler-router;
 #X obj 1100 80 sampler-slot-1;
 #X obj 1100 140 sampler-slot-2;
@@ -71,11 +75,13 @@
 #X obj 460 725 print autotrim-preroll-recv;
 #X obj 680 520 r sampler-router-input;
 #X obj 680 545 print router-input-recv;
-#X connect 36 0 37 0;
-#X connect 38 0 39 0;
+#X connect 27 0 28 0;
+#X connect 28 0 29 0;
 #X connect 40 0 41 0;
 #X connect 42 0 43 0;
 #X connect 44 0 45 0;
+#X connect 46 0 47 0;
+#X connect 48 0 49 0;
 #X connect 2 0 3 0;
 #X connect 3 0 5 0;
 #X connect 3 0 4 0;
@@ -93,13 +99,12 @@
 #X connect 5 11 17 0;
 #X connect 5 12 18 0;
 #X connect 5 13 19 0;
-#X connect 20 0 21 0;
-#X connect 22 0 23 0;
+#X connect 5 14 20 0;
+#X connect 21 0 22 0;
 #X connect 23 0 24 0;
-#X connect 23 1 25 0;
-#X connect 24 0 21 0;
-#X connect 46 0 47 0;
-#X connect 48 0 49 0;
+#X connect 24 0 25 0;
+#X connect 24 1 26 0;
+#X connect 25 0 22 0;
 #X connect 50 0 51 0;
 #X connect 52 0 53 0;
 #X connect 54 0 55 0;
@@ -111,3 +116,5 @@
 #X connect 66 0 67 0;
 #X connect 68 0 69 0;
 #X connect 70 0 71 0;
+#X connect 72 0 73 0;
+#X connect 74 0 75 0;

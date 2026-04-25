@@ -366,6 +366,13 @@ function handleFrontendMessage(msg, ws) {
       broadcast({ type: "samplerVol", slot: msg.slot, value: v });
       break;
     }
+    case "samplerMasterVol": {
+      // Master-vol: per slot een eigen [r sampler-master-vol] -> [pack 0 20] -> [line~] -> *~ chain
+      const v = clamp(msg.value, 0, 1);
+      sendSampler("sampler-master-vol", v);
+      broadcast({ type: "samplerMasterVol", value: v });
+      break;
+    }
     case "samplerSpeed": {
       const v = clamp(msg.value, 0.1, 4);
       if (samplerState[msg.slot]) samplerState[msg.slot].speed = v;

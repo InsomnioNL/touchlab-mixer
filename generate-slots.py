@@ -137,9 +137,10 @@ def build_host(num_slots, num_channels=4, test_mode=True):
                 "sampler-vol sampler-speed sampler-rec-start "
                 "sampler-rec-stop sampler-trim sampler-trim-end "
                 "sampler-autotrim sampler-autotrim-threshold "
-                "sampler-autotrim-preroll sampler-router-input")
+                "sampler-autotrim-preroll sampler-router-input "
+                "sampler-master-vol")
 
-    # 13 route outlets → 13 sends (+ unknown-fudi catch-all)
+    # 14 route outlets → 14 sends (+ unknown-fudi catch-all)
     send_specs = [
         (20,  190, "s sampler-load"),
         (140, 190, "s sampler-play"),
@@ -154,6 +155,7 @@ def build_host(num_slots, num_channels=4, test_mode=True):
         (500, 220, "s sampler-autotrim-threshold"),
         (760, 220, "s sampler-autotrim-preroll"),
         (20,  250, "s sampler-router-input"),
+        (200, 250, "s sampler-master-vol"),
     ]
     send_idxs = [pd.obj(x, y, c) for (x, y, c) in send_specs]
 
@@ -172,6 +174,19 @@ def build_host(num_slots, num_channels=4, test_mode=True):
     tbb = pd.obj(20, 445, "t b b")
     m_connect = pd.msg(20, 480, "connect 127.0.0.1 9003")
     m_dsp = pd.msg(180, 480, r"\; pd dsp 1")
+
+    # ------------------------------------------------------------------
+    # Master-vol initialisatie:
+    # Bridge stuurt 'sampler-master-vol <0..1>'. Het [s sampler-master-vol]
+    # in de FUDI-route bovenin geeft dat door aan elke slot's eigen
+    # [r sampler-master-vol] -> [line~] -> *~. Hier alleen een loadbang
+    # die 1.0 stuurt zodat slots bij Pd-startup vol open staan.
+    # ------------------------------------------------------------------
+    mv_lb     = pd.obj(20, 540, "loadbang")
+    mv_init   = pd.msg(20, 565, "1")
+    mv_init_s = pd.obj(20, 590, "s sampler-master-vol")
+    pd.connect(mv_lb, 0, mv_init, 0)
+    pd.connect(mv_init, 0, mv_init_s, 0)
 
     # ------------------------------------------------------------------
     # Sampler router abstraction
