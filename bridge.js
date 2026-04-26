@@ -181,15 +181,38 @@ function computeGate(chIdx) {
 
 // ─── PD FUDI (mixer, TCP) ──────────────────────────────────────────────────
 let pdSocket = null, pdReady = false;
+let pdReconnectTimer = null;
+let pdBackoffMs = 1000;          // start: 1s
+const PD_BACKOFF_MAX = 30000;    // cap: 30s
+
+function scheduleReconnectPD() {
+  if (pdReconnectTimer) return;  // er staat er al één; geen dubbele timers
+  pdReconnectTimer = setTimeout(() => {
+    pdReconnectTimer = null;
+    connectToPD();
+  }, pdBackoffMs);
+  pdBackoffMs = Math.min(pdBackoffMs * 2, PD_BACKOFF_MAX);
+}
 
 function connectToPD() {
+  // oude socket netjes opruimen vóór nieuwe poging
+  if (pdSocket) { try { pdSocket.destroy(); } catch (e) {} pdSocket = null; }
+
   pdSocket = net.connect(PD_FUDI_PORT, "127.0.0.1", () => {
     pdReady = true;
+    pdBackoffMs = 1000;          // reset bij succes
     console.log(`✓  Verbonden met PD op poort ${PD_FUDI_PORT}`);
     initPD();
   });
-  pdSocket.on("error", err => { pdReady = false; console.warn(`⚠  PD: ${err.message}`); setTimeout(connectToPD, 3000); });
-  pdSocket.on("close", () => { pdReady = false; setTimeout(connectToPD, 3000); });
+  pdSocket.on("error", err => {
+    if (pdReady) console.warn(`⚠  PD: ${err.message}`);  // eerste error per cyclus loggen
+    pdReady = false;
+    scheduleReconnectPD();
+  });
+  pdSocket.on("close", () => {
+    pdReady = false;
+    scheduleReconnectPD();
+  });
 }
 
 function sendPD(receiver, ...args) {
