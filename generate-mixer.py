@@ -358,9 +358,11 @@ def write_main(channels, osc_in_port, with_ttb=False, sampler_cfg=None):
         # Status return: UDP out
         yt3 = yt2 + 40
         s_stat_r = add(f"#X obj 900 {yt3} r sampler-status-out;")
-        s_ns     = add(f"#X obj 900 {yt3+30} netsend -u -b;")
-        m_connect = add(f"#X msg 900 {yt3+60} connect 127.0.0.1 {s_stat};")
-        lines.append(f"#X connect {s_stat_r} 0 {s_ns} 0;")
+        s_fmt    = add(f"#X obj 900 {yt3+25} fudiformat;")  # FUDIFORMAT-PATCH-V1
+        s_ns     = add(f"#X obj 900 {yt3+50} netsend -u -b;")
+        m_connect = add(f"#X msg 900 {yt3+80} connect 127.0.0.1 {s_stat};")
+        lines.append(f"#X connect {s_stat_r} 0 {s_fmt} 0;")
+        lines.append(f"#X connect {s_fmt} 0 {s_ns} 0;")
         lines.append(f"#X connect {lb} 0 {m_connect} 0;")
         lines.append(f"#X connect {m_connect} 0 {s_ns} 0;")
 
@@ -485,9 +487,11 @@ def write_main_ttb(channels, osc_in_port, sampler_cfg):
     lines.append(f"#X connect {s_rt} {len(send_specs)} {s_unk} 0;")
 
     s_stat_r  = add("#X obj 456 142 r sampler-status-out;")
-    s_ns      = add("#X obj 456 172 netsend -u -b;")
-    m_connect = add(f"#X msg 456 202 connect 127.0.0.1 {s_stat};")
-    lines.append(f"#X connect {s_stat_r} 0 {s_ns} 0;")
+    s_fmt     = add("#X obj 456 167 fudiformat;")  # FUDIFORMAT-PATCH-V1
+    s_ns      = add("#X obj 456 192 netsend -u -b;")
+    m_connect = add(f"#X msg 456 217 connect 127.0.0.1 {s_stat};")
+    lines.append(f"#X connect {s_stat_r} 0 {s_fmt} 0;")
+    lines.append(f"#X connect {s_fmt} 0 {s_ns} 0;")
     lines.append(f"#X connect {lb} 0 {m_connect} 0;")
     lines.append(f"#X connect {m_connect} 0 {s_ns} 0;")
 

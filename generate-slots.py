@@ -165,7 +165,8 @@ def build_host(num_slots, num_channels=4, test_mode=True):
     # Status return path
     # ------------------------------------------------------------------
     r_stat = pd.obj(20, 340, "r sampler-status-out")
-    ns = pd.obj(20, 365, "netsend 1")
+    fmt    = pd.obj(20, 365, "fudiformat")  # FUDIFORMAT-PATCH-V1
+    ns     = pd.obj(20, 390, "netsend -u -b")
 
     # ------------------------------------------------------------------
     # Loadbang: connect to 9003 and enable DSP
@@ -268,6 +269,8 @@ def build_host(num_slots, num_channels=4, test_mode=True):
     pd.connect(lb, 0, tbb, 0)
     pd.connect(tbb, 0, m_connect, 0)   # tbb outlet 0 (fires last) → connect
     pd.connect(tbb, 1, m_dsp, 0)       # tbb outlet 1 (fires first) → dsp
+    pd.connect(r_stat, 0, fmt, 0)      # r → fudiformat (FUDIFORMAT-PATCH-V1)
+    pd.connect(fmt, 0, ns, 0)          # fudiformat → netsend
     pd.connect(m_connect, 0, ns, 0)    # connect msg → netsend left inlet
 
     # Debug prints

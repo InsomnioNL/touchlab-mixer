@@ -43,14 +43,21 @@
   },
   "ttb": {
     "samples_dir": "samples",
-    "default_slot_count": 2,
+    "default_slot_count": 1,
     "slots": [
       {
         "slot": 1,
         "file": "slot1.wav",
         "label": "SLOT 1",
         "vol": 0.8,
-        "color": "neutral"
+        "color": "neutral",
+        "history": [
+          {
+            "filename": "slot1_2026-04-27-09-54-35.wav",
+            "recorded_at": "2026-04-27T07:54:35.533Z",
+            "duration_seconds": 2.4
+          }
+        ]
       },
       {
         "slot": 5,
@@ -79,6 +86,26 @@
         "label": "BKBK",
         "vol": 0.8,
         "color": "magenta"
+      },
+      {
+        "slot": 7,
+        "file": "attenborough.wav",
+        "label": "SLOT 7",
+        "vol": 0.8,
+        "color": "neutral"
+      },
+      {
+        "slot": 6,
+        "label": "SLOT 6",
+        "vol": 0.8,
+        "color": "neutral"
+      },
+      {
+        "slot": 8,
+        "label": "SLOT 8",
+        "vol": 0.8,
+        "color": "neutral",
+        "file": "slot8.wav"
       }
     ],
     "button_order": [
@@ -86,8 +113,13 @@
       5,
       2,
       3,
-      4
+      4,
+      7
     ],
-    "queue": []
+    "queue": [
+      1,
+      1,
+      1
+    ]
   }
 }

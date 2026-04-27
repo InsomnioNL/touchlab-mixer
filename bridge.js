@@ -289,6 +289,59 @@ function loadTTBSamples() {
   console.log(`✓  ${loaded} TTB-samples geladen`);
 }
 
+// === REC-HISTORY-V1 ===
+// Bij rec-stop: kopieert slotN.wav naar slotN_<timestamp>.wav en voegt
+// een history-entry toe aan cfg.ttb.slots[N]. Persisteert sessie via
+// saveSessionToDisk. Faalt zacht bij disk-fouten (warning, geen crash).
+function archiveRecording(slot) {
+  if (!SAMPLER_ENABLED) return;
+
+  const samplesDir = cfg.ttb?.samples_dir || "samples";
+  const fullSamplesDir = path.isAbsolute(samplesDir) ? samplesDir : path.join(process.cwd(), samplesDir);
+  const srcPath = path.join(fullSamplesDir, `slot${slot}.wav`);
+
+  // Lokale tijd in sortbaar formaat: YYYY-MM-DD-HH-MM-SS
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const ts = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  const archiveName = `slot${slot}_${ts}.wav`;
+  const archivePath = path.join(fullSamplesDir, archiveName);
+
+  // Duration: ms verschil tussen recording-start en nu
+  const startTs = samplerState[slot]?.recStartTs;
+  const durationSec = startTs ? Math.round((Date.now() - startTs) / 100) / 10 : null;
+
+  try {
+    fs.copyFileSync(srcPath, archivePath);
+  } catch (err) {
+    console.warn(`⚠  Kon ${srcPath} niet archiveren: ${err.message}`);
+    return;
+  }
+
+  // History-entry toevoegen aan cfg.ttb.slots[slot]
+  const entry = {
+    filename: archiveName,
+    recorded_at: d.toISOString(),
+  };
+  if (durationSec != null) entry.duration_seconds = durationSec;
+
+  const slotEntry = cfg.ttb.slots.find(s => s.slot === slot);
+  if (!slotEntry) {
+    console.warn(`⚠  archiveRecording: slot ${slot} niet in cfg.ttb.slots (zou niet moeten kunnen na ensureSlotEntries)`);
+    return;
+  }
+  if (!Array.isArray(slotEntry.history)) slotEntry.history = [];
+  slotEntry.history.push(entry);
+
+  // Persisteer naar disk
+  try {
+    saveSessionToDisk(cfg, null);
+    console.log(`+  Slot ${slot} archief: ${archiveName}${durationSec != null ? ` (${durationSec}s)` : ""}`);
+  } catch (err) {
+    console.warn(`⚠  Sessie-save na archive faalde: ${err.message}`);
+  }
+}
+
 // ─── Sampler FUDI (TTB, UDP) ───────────────────────────────────────────────
 // Outbound:   bridge → Pd op SAMPLER_FUDI (9002) als text-FUDI in UDP packets
 // Inbound:    Pd → bridge op SAMPLER_STAT (9003) met sampler-status events
@@ -308,6 +361,7 @@ samplerIn.on("message", buf => {
   const line = buf.toString().replace(/;\s*$/,"").trim();
   if (!line) return;
   const parts = line.split(/\s+/);
+  if (parts[0] === "list") parts.shift();  // fudiformat prefixt list-messages
   if (parts[0] !== "sampler-status" || parts.length < 3) return;
 
   const slot = parseInt(parts[1]);
@@ -318,8 +372,8 @@ samplerIn.on("message", buf => {
 
   // State-machine: mappen van event naar state-veld
   switch (event) {
-    case "recording":   samplerState[slot].state = "recording"; break;
-    case "rec-stopped": samplerState[slot].state = "idle";      break;
+    case "recording":   samplerState[slot].state = "recording"; samplerState[slot].recStartTs = Date.now(); break;
+    case "rec-stopped": samplerState[slot].state = "idle"; archiveRecording(slot); break;
     case "playing":     samplerState[slot].state = "playing";   break;
     case "stopped":     samplerState[slot].state = "idle";      break;
     case "input":       if (extra) samplerState[slot].source = extra; break;
