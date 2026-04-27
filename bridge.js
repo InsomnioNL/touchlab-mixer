@@ -357,11 +357,22 @@ function sendSampler(cmd, ...args) {
 }
 
 samplerIn.on("error", err => console.warn(`⚠  Sampler RX: ${err.message}`));
+// === SAMPLER-EVENT-DEDUPE-V1 ===
+// Pd dupliceert sommige status-broadcasts (~9x per event); de oorzaak
+// zit in de patch-architectuur (open issue). Bridge dedupt hier:
+// hetzelfde (slot, event) binnen 500ms wordt slechts 1x verwerkt.
+const samplerEventLastSeen = new Map();  // key: "slot:event", value: timestamp
+const SAMPLER_EVENT_DEDUPE_MS = 500;
+
 samplerIn.on("message", buf => {
   const line = buf.toString().replace(/;\s*$/,"").trim();
   if (!line) return;
   const parts = line.split(/\s+/);
-  if (parts[0] === "list") parts.shift();  // fudiformat prefixt list-messages
+  // === LIST-PREFIX-STRIP-V1 ===
+  // Pd's [fudiformat] serializeert Pd-lists als "list <items>" -
+  // het "list"-prefix moet weg vóór de sampler-status-check, anders
+  // worden alle status-events gedropt.
+  if (parts[0] === "list") parts.shift();
   if (parts[0] !== "sampler-status" || parts.length < 3) return;
 
   const slot = parseInt(parts[1]);
@@ -369,6 +380,15 @@ samplerIn.on("message", buf => {
 
   const event = parts[2];
   const extra = parts.slice(3).join(" ") || null;
+
+  // === SAMPLER-EVENT-DEDUPE-V1 ===
+  const dedupeKey = `${slot}:${event}`;
+  const now = Date.now();
+  const lastSeen = samplerEventLastSeen.get(dedupeKey);
+  if (lastSeen && (now - lastSeen) < SAMPLER_EVENT_DEDUPE_MS) {
+    return;  // duplicate, drop
+  }
+  samplerEventLastSeen.set(dedupeKey, now);
 
   // State-machine: mappen van event naar state-veld
   switch (event) {
@@ -396,6 +416,9 @@ const vuServer = dgram.createSocket("udp4");
 vuServer.bind(VU_LISTEN_PORT, () => console.log(`✓  VU luisteren op UDP ${VU_LISTEN_PORT}`));
 vuServer.on("message", buf => {
   const parts = buf.toString().replace(/;\s*$/, "").trim().split(/\s+/);
+  // === VU-LIST-PREFIX-STRIP-V1 ===
+  // Pd's [fudiformat] prefixt list-messages met 'list' - moet weg.
+  if (parts[0] === "list") parts.shift();
   if (parts[0] !== "vu" || parts.length < 3) return;
   const who = parts[1], val = parseFloat(parts[2]);
   if (who === "master") masterVu = val;
@@ -566,8 +589,14 @@ function saveSessionToDisk(newConfig, ws) {
   }
   try {
     // Als de UI alleen het ttb-deel stuurt (__ttb_only flag), merge dat in cfg
+    // === SAVESESSION-SELFREF-V1 ===
+    // Als newConfig === cfg (zelf-referentie vanuit interne aanroepers
+    // zoals archiveRecording), deep-copy om data-loss te voorkomen bij
+    // de delete-then-reassign-cyclus hieronder.
     var fullConfig;
-    if (newConfig.__ttb_only && newConfig.ttb) {
+    if (newConfig === cfg) {
+      fullConfig = JSON.parse(JSON.stringify(cfg));
+    } else if (newConfig.__ttb_only && newConfig.ttb) {
       fullConfig = JSON.parse(JSON.stringify(cfg));
       fullConfig.ttb = newConfig.ttb;
     } else {

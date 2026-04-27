@@ -235,11 +235,16 @@ def write_vu_sender(channels, vu_host, vu_port, vu_ms):
     metro  = add(f"#X obj 10 20 metro {vu_ms};")
     lb     = add("#X obj 10 40 loadbang;")
     bang   = add("#X msg 10 60 bang;")
-    ns     = add(f"#X obj 10 80 netsend -u -b {vu_host} {vu_port};")
+    fmt    = add("#X obj 10 80 fudiformat;")  # VUSENDER-FUDIFORMAT-V1
+    ns     = add("#X obj 10 100 netsend -u -b;")  # VUSENDER-CONNECT-MSG-V1
+    cm     = add(f"#X msg 10 130 connect {vu_host} {vu_port};")
     router = add("#X obj 200 20 r vu-out;")
     lines.append(f"#X connect {lb} 0 {bang} 0;")
     lines.append(f"#X connect {bang} 0 {metro} 0;")
-    lines.append(f"#X connect {router} 0 {ns} 0;")
+    lines.append(f"#X connect {router} 0 {fmt} 0;")
+    lines.append(f"#X connect {fmt} 0 {ns} 0;")
+    lines.append(f"#X connect {lb} 0 {cm} 0;")
+    lines.append(f"#X connect {cm} 0 {ns} 0;")
 
     y = 120
     for ch in channels:
