@@ -402,11 +402,13 @@ def write_main_ttb(channels, osc_in_port, sampler_cfg):
 
     s_nr = add(f"#X obj 633 27 netreceive -u -b {s_port};")
     s_fp = add("#X obj 633 57 fudiparse;")
+    # ABSORB-HOST-PATCHES-V1: route uitgebreid met sampler-master-vol
+    # en sampler-rec-path (voorheen toegevoegd door post-regen patches).
     s_rt = add("#X obj 633 87 route sampler-load sampler-play sampler-stop "
                "sampler-vol sampler-speed sampler-rec-start sampler-rec-stop "
                "sampler-trim sampler-trim-end sampler-autotrim "
                "sampler-autotrim-threshold sampler-autotrim-preroll "
-               "sampler-router-input;")
+               "sampler-router-input sampler-master-vol sampler-rec-path;")
     lines.append(f"#X connect {s_nr} 0 {s_fp} 0;")
     lines.append(f"#X connect {s_fp} 0 {s_rt} 0;")
 
@@ -424,6 +426,8 @@ def write_main_ttb(channels, osc_in_port, sampler_cfg):
         (910, 268, "sampler-autotrim-threshold"),
         (936, 243, "sampler-autotrim-preroll"),
         (965, 218, "sampler-router-input"),
+        (900, 230, "sampler-master-vol"),    # ABSORB-HOST-PATCHES-V1
+        (2000, 1200, "sampler-rec-path"),    # ABSORB-HOST-PATCHES-V1
     ]
     for i, (sx, sy, sname) in enumerate(send_specs):
         s_s = add(f"#X obj {sx} {sy} s {sname};")

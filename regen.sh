@@ -36,8 +36,10 @@ if [ ! -f sampler-slot-1.pd ]; then
     exit 1
 fi
 
+# ABSORB-HOST-PATCHES-REGEN-V1: master-vol + rec-path patches voor
+# touchlab-mixer-ttb.pd zijn geabsorbeerd in write_main_ttb.
+# patch-sampler-host-rec-path.py blijft (sampler-host.pd, test-mode).
 for script in generate-mixer.py generate-router.py generate-slots.py \
-              patch-host-master-vol.py patch-host-rec-path.py \
               patch-sampler-host-rec-path.py; do
     if [ ! -f "$script" ]; then
         echo "ERROR: $script not found in $(pwd)" >&2
@@ -66,10 +68,8 @@ echo "────────────────────────�
 python3 generate-slots.py
 echo ""
 
-echo "[4/4] Post-regen patches  (master-vol + rec-path injection)"
+echo "[4/4] Post-regen patches  (sampler-host rec-path injection)"
 echo "────────────────────────────────────────────────────────────────"
-python3 patch-host-master-vol.py
-python3 patch-host-rec-path.py
 python3 patch-sampler-host-rec-path.py
 echo ""
 
