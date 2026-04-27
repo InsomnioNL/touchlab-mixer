@@ -335,7 +335,7 @@ function archiveRecording(slot) {
 
   // Persisteer naar disk
   try {
-    saveSessionToDisk(cfg, null);
+    saveSessionToDisk(cfg, null, { skipReload: true });
     console.log(`+  Slot ${slot} archief: ${archiveName}${durationSec != null ? ` (${durationSec}s)` : ""}`);
   } catch (err) {
     console.warn(`⚠  Sessie-save na archive faalde: ${err.message}`);
@@ -582,11 +582,15 @@ function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 // ─── Sessie-config schrijven en samples lijsten ────────────────────────────
 // Atomic write: eerst naar tijdelijk bestand, dan rename. Voorkomt corrupte
 // session.json als het schrijven onderbroken wordt.
-function saveSessionToDisk(newConfig, ws) {
+function saveSessionToDisk(newConfig, ws, opts) {
   if (!newConfig || typeof newConfig !== "object") {
     if (ws) ws.send(JSON.stringify({type:"saveSessionResult", ok:false, error:"invalid config"}));
     return;
   }
+  // === SKIP-RELOAD-V1 ===
+  // Interne aanroepers (archiveRecording) hebben alleen history-state
+  // bijgewerkt — Pd hoeft niets opnieuw te laden.
+  var skipReload = opts && opts.skipReload === true;
   try {
     // Als de UI alleen het ttb-deel stuurt (__ttb_only flag), merge dat in cfg
     // === SAVESESSION-SELFREF-V1 ===
@@ -617,7 +621,7 @@ function saveSessionToDisk(newConfig, ws) {
     Object.assign(cfg, fullConfig);
     console.log(`✓  Sessie opgeslagen naar ${configPath} + sessions/${sanitizeSessionName(sname)}.json`);
     // Herlaad TTB-samples in Pd op basis van nieuwe config
-    if (SAMPLER_ENABLED) { ensureSlotEntries(); loadTTBSamples(); }
+    if (SAMPLER_ENABLED && !skipReload) { ensureSlotEntries(); loadTTBSamples(); }
     // Bevestig naar afzender, en broadcast naar andere clients
     if (ws) ws.send(JSON.stringify({type:"saveSessionResult", ok:true}));
     broadcast({type:"sessionUpdated", ttb: cfg.ttb || null});

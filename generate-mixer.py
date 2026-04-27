@@ -268,13 +268,13 @@ def write_vu_sender(channels, vu_host, vu_port, vu_ms):
 
 
 def write_main(channels, osc_in_port, with_ttb=False, sampler_cfg=None):
-    """Schrijf touchlab-mixer.pd of touchlab-mixer-ttb.pd.
+    """Schrijf touchlab-mixer.pd (basic, zonder TTB).
 
-    Als with_ttb=True: voegt sampler-router, sampler-slots, en een tweede
-    FUDI-input (UDP 9002) toe voor sampler-commando's.
+    REMOVE-DEADCODE-V1: parameters with_ttb en sampler_cfg blijven bestaan
+    voor backward compat maar zijn no-ops. TTB-versie wordt door
+    write_main_ttb afgehandeld (cleanup-merge, commit 287f368).
     """
     N = len(channels)
-    suffix = "-ttb" if with_ttb else ""
     lines = ["#N canvas 0 0 1400 900 12;"]
     n = [0]
     def add(l):
@@ -325,69 +325,10 @@ def write_main(channels, osc_in_port, with_ttb=False, sampler_cfg=None):
     lines.append(f"#X connect {lb} 0 {cm} 0;")
     lines.append(f"#X connect {cm} 0 {cs} 0;")
 
-    # ------------------------------------------------------------------
-    # TTB: sampler-router, sampler slots, sampler FUDI input, status out
-    # ------------------------------------------------------------------
-    if with_ttb and sampler_cfg:
-        slots   = sampler_cfg.get("slots", 8)
-        s_port  = sampler_cfg.get("fudi_port", 9002)
-        s_stat  = sampler_cfg.get("status_port", 9003)
-
-        yt = 80
-        # Sampler UDP netreceive
-        s_nr  = add(f"#X obj 900 {yt} netreceive -u -b {s_port};")
-        s_fp  = add(f"#X obj 900 {yt+30} fudiparse;")
-        s_rt  = add(f"#X obj 900 {yt+60} route sampler-load sampler-play sampler-stop sampler-vol sampler-speed sampler-rec-start sampler-rec-stop sampler-trim sampler-trim-end sampler-autotrim sampler-autotrim-threshold sampler-autotrim-preroll sampler-router-input;")
-        lines.append(f"#X connect {s_nr} 0 {s_fp} 0;")
-        lines.append(f"#X connect {s_fp} 0 {s_rt} 0;")
-
-        # 13 sends for each route outlet
-        send_names = [
-            "sampler-load", "sampler-play", "sampler-stop",
-            "sampler-vol", "sampler-speed", "sampler-rec-start",
-            "sampler-rec-stop", "sampler-trim", "sampler-trim-end",
-            "sampler-autotrim", "sampler-autotrim-threshold",
-            "sampler-autotrim-preroll", "sampler-router-input",
-        ]
-        for i, sname in enumerate(send_names):
-            sx = 900 + (i % 7) * 100
-            sy = yt + 100 + (i // 7) * 30
-            s_s = add(f"#X obj {sx} {sy} s {sname};")
-            lines.append(f"#X connect {s_rt} {i} {s_s} 0;")
-
-        # unknown-catch
-        yt2 = yt + 180
-        s_unk = add(f"#X obj 900 {yt2} print sampler-unknown-fudi;")
-        lines.append(f"#X connect {s_rt} {len(send_names)} {s_unk} 0;")
-
-        # Status return: UDP out
-        yt3 = yt2 + 40
-        s_stat_r = add(f"#X obj 900 {yt3} r sampler-status-out;")
-        s_fmt    = add(f"#X obj 900 {yt3+25} fudiformat;")  # FUDIFORMAT-PATCH-V1
-        s_ns     = add(f"#X obj 900 {yt3+50} netsend -u -b;")
-        m_connect = add(f"#X msg 900 {yt3+80} connect 127.0.0.1 {s_stat};")
-        lines.append(f"#X connect {s_stat_r} 0 {s_fmt} 0;")
-        lines.append(f"#X connect {s_fmt} 0 {s_ns} 0;")
-        lines.append(f"#X connect {lb} 0 {m_connect} 0;")
-        lines.append(f"#X connect {m_connect} 0 {s_ns} 0;")
-
-        # Router abstraction
-        yt4 = yt3 + 120
-        s_router = add(f"#X obj 900 {yt4} sampler-router;")
-
-        # Slot abstractions (2 cols x 4 rows)
-        for i in range(slots):
-            col = i // 4
-            row = i % 4
-            sx = 1100 + col * 150
-            sy = 80 + row * 50
-            add(f"#X obj {sx} {sy} sampler-slot-{i + 1};")
-
-    fname = f"touchlab-mixer{suffix}.pd"
+    fname = "touchlab-mixer.pd"
     with open(fname, "w") as f:
         f.write("\n".join(lines) + "\n")
-    print(f"  ✓  {fname}  ({N} kanalen, TCP poort {osc_in_port}"
-          f"{', +TTB sampler' if with_ttb else ''})")
+    print(f"  ✓  {fname}  ({N} kanalen, TCP poort {osc_in_port})")
 
 
 # === MIXER-CLEANUP-PATCH-V1 ===

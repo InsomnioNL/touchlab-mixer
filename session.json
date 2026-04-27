@@ -56,6 +56,11 @@
             "filename": "slot1_2026-04-27-09-54-35.wav",
             "recorded_at": "2026-04-27T07:54:35.533Z",
             "duration_seconds": 2.4
+          },
+          {
+            "filename": "slot1_2026-04-27-16-17-41.wav",
+            "recorded_at": "2026-04-27T14:17:41.263Z",
+            "duration_seconds": 3.7
           }
         ]
       },
