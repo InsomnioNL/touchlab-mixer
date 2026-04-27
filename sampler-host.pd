@@ -4,7 +4,7 @@
 #X obj 20 80 netreceive -u -b 9002;
 #X obj 20 110 fudiparse;
 #X obj 280 110 print fudi-raw;
-#X obj 20 150 route sampler-load sampler-play sampler-stop sampler-vol sampler-speed sampler-rec-start sampler-rec-stop sampler-trim sampler-trim-end sampler-autotrim sampler-autotrim-threshold sampler-autotrim-preroll sampler-router-input sampler-master-vol;
+#X obj 20 150 route sampler-load sampler-play sampler-stop sampler-vol sampler-speed sampler-rec-start sampler-rec-stop sampler-trim sampler-trim-end sampler-autotrim sampler-autotrim-threshold sampler-autotrim-preroll sampler-router-input sampler-master-vol sampler-rec-path;
 #X obj 20 190 s sampler-load;
 #X obj 140 190 s sampler-play;
 #X obj 260 190 s sampler-stop;
@@ -99,7 +99,7 @@
 #X connect 5 11 17 0;
 #X connect 5 12 18 0;
 #X connect 5 13 19 0;
-#X connect 5 14 20 0;
+#X connect 5 15 20 0;
 #X connect 21 0 22 0;
 #X connect 23 0 24 0;
 #X connect 24 0 25 0;
@@ -118,3 +118,6 @@
 #X connect 70 0 71 0;
 #X connect 72 0 73 0;
 #X connect 74 0 75 0;
+#X obj 900 260 s sampler-rec-path;
+#X text 1100 260 REC-PATH-SAMPLER-HOST-PATCH-V1;
+#X connect 5 14 76 0;

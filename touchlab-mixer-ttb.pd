@@ -29,7 +29,7 @@
 #X obj 460 111 s mixer-info;
 #X obj 633 27 netreceive -u -b 9002;
 #X obj 633 57 fudiparse;
-#X obj 633 87 route sampler-load sampler-play sampler-stop sampler-vol sampler-speed sampler-rec-start sampler-rec-stop sampler-trim sampler-trim-end sampler-autotrim sampler-autotrim-threshold sampler-autotrim-preroll sampler-router-input sampler-master-vol;
+#X obj 633 87 route sampler-load sampler-play sampler-stop sampler-vol sampler-speed sampler-rec-start sampler-rec-stop sampler-trim sampler-trim-end sampler-autotrim sampler-autotrim-threshold sampler-autotrim-preroll sampler-router-input sampler-master-vol sampler-rec-path;
 #X obj 638 530 s sampler-load;
 #X obj 664 503 s sampler-play;
 #X obj 688 472 s sampler-stop;
@@ -90,6 +90,9 @@
 #X connect 30 11 42 0;
 #X connect 30 12 43 0;
 #X connect 30 13 57 0;
-#X connect 30 14 44 0;
+#X connect 30 15 44 0;
 #X connect 45 0 46 0;
 #X connect 47 0 46 0;
+#X obj 2000 1200 s sampler-rec-path;
+#X text 2200 1200 REC-PATH-HOST-PATCH-V1;
+#X connect 30 14 59 0;

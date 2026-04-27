@@ -377,7 +377,14 @@ function handleFrontendMessage(msg, ws) {
     case "recStart":   { startRecording(); break; }
     case "recStop":    { stopRecording(); break; }
     // Sampler (TTB) — transport
-    case "samplerRecStart": { sendSampler("sampler-rec-start", msg.slot); break; }
+    case "samplerRecStart": {
+      const samplesDir = cfg.ttb?.samples_dir || "samples";
+      const fullSamplesDir = path.isAbsolute(samplesDir) ? samplesDir : path.join(process.cwd(), samplesDir);
+      const recPath = path.join(fullSamplesDir, `slot${msg.slot}.wav`);
+      sendSampler("sampler-rec-path", msg.slot, recPath);
+      sendSampler("sampler-rec-start", msg.slot);
+      break;
+    }
     case "samplerRecStop":  { sendSampler("sampler-rec-stop",  msg.slot); break; }
     case "samplerPlay":     { sendSampler("sampler-play",      msg.slot); break; }
     case "samplerStop":     { sendSampler("sampler-stop",      msg.slot); break; }
