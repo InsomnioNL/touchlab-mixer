@@ -233,7 +233,36 @@ function initPD() {
   sendPD("fxReturn", fxReturn);
   console.log("✓  Beginwaarden naar PD gestuurd");
   // Na mixer-init de TTB-samples laden in de sampler-slots
+  ensureSlotEntries();
   setTimeout(loadTTBSamples, 300);
+}
+
+// === ENSURE-SLOT-ENTRIES-V1 ===
+// Zorgt dat cfg.ttb.slots voor elke slot 1..SAMPLER_SLOTS een entry heeft.
+// Default-entries zijn minimaal: {slot, label, vol, color} - geen 'file'-veld,
+// zodat loadTTBSamples ze netjes skipt (geen sampler-load voor lege slots).
+// Pas zodra een rec gebeurt en history zich opbouwt, krijgt zo'n slot een file.
+function ensureSlotEntries() {
+  if (!SAMPLER_ENABLED) return;
+  if (!cfg.ttb) cfg.ttb = {};
+  if (!Array.isArray(cfg.ttb.slots)) cfg.ttb.slots = [];
+
+  const present = new Set(cfg.ttb.slots.map(s => s.slot).filter(n => typeof n === "number"));
+  let added = 0;
+  for (let i = 1; i <= SAMPLER_SLOTS; i++) {
+    if (!present.has(i)) {
+      cfg.ttb.slots.push({
+        slot: i,
+        label: `SLOT ${i}`,
+        vol: 0.8,
+        color: "neutral",
+      });
+      added++;
+    }
+  }
+  if (added > 0) {
+    console.log(`+  ${added} slot-entries toegevoegd aan cfg.ttb.slots (default placeholders)`);
+  }
 }
 
 // ─── TTB sample-loader ─────────────────────────────────────────────────────
@@ -505,7 +534,7 @@ function saveSessionToDisk(newConfig, ws) {
     Object.assign(cfg, fullConfig);
     console.log(`✓  Sessie opgeslagen naar ${configPath} + sessions/${sanitizeSessionName(sname)}.json`);
     // Herlaad TTB-samples in Pd op basis van nieuwe config
-    if (SAMPLER_ENABLED) loadTTBSamples();
+    if (SAMPLER_ENABLED) { ensureSlotEntries(); loadTTBSamples(); }
     // Bevestig naar afzender, en broadcast naar andere clients
     if (ws) ws.send(JSON.stringify({type:"saveSessionResult", ok:true}));
     broadcast({type:"sessionUpdated", ttb: cfg.ttb || null});
