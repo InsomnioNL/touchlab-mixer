@@ -996,7 +996,7 @@ function connect(url){
       }
       return;
     }
-    if(msg.type==='vu'){masterVu=msg.masterVu||-60;(msg.channels||[]).forEach(u=>{var c=channels.find(x=>x.index===u.index);if(c)c.vu=u.vu});updateVUs();return}
+    if(msg.type==='vu'){/*FRONTEND-STEREO-VU-V1*/masterVu=msg.masterVu||-60;masterVuL=(typeof msg.masterVuL==='number')?msg.masterVuL:masterVu;masterVuR=(typeof msg.masterVuR==='number')?msg.masterVuR:masterVu;(msg.channels||[]).forEach(u=>{var c=channels.find(x=>x.index===u.index);if(c)c.vu=u.vu});updateVUs();return}
     if(msg.type==='samplerStatus'){handleSamplerStatus(msg);return}
     if(msg.type==='sampleList'){
       ttbAvailableSamples = msg.files || [];
@@ -1212,9 +1212,10 @@ function updSG(id,db){
 }
 function updateVUs(){
   channels.forEach(c=>updSG(c.index,c.mute?-60:c.vu));
-  updSG('ml',dbP(masterVuL||masterVu)/100*60-60);
+  // FRONTEND-VU-CLEANUP-V1
+  updSG('ml',masterVuL);
   updSG('m',masterVu);
-  updSG('mr',dbP(masterVuR||masterVu)/100*60-60);
+  updSG('mr',masterVuR);
 }
 
 // ── Knob ───────────────────────────────────────────────────────────────────

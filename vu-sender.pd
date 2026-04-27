@@ -32,8 +32,13 @@
 #X obj 10 400 s vu-out;
 #X connect 16 0 17 0;
 #X connect 17 0 18 0;
-#X obj 300 120 r masterVu;
-#X obj 300 140 list prepend vu master;
+#X obj 300 120 r masterVuL;
+#X obj 300 140 list prepend vu masterL;
 #X obj 300 160 s vu-out;
 #X connect 19 0 20 0;
 #X connect 20 0 21 0;
+#X obj 400 120 r masterVuR;
+#X obj 400 140 list prepend vu masterR;
+#X obj 400 160 s vu-out;
+#X connect 22 0 23 0;
+#X connect 23 0 24 0;

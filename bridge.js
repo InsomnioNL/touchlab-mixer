@@ -70,7 +70,7 @@ const state = {};
 CHANNELS.forEach(ch => {
   state[ch.index] = { name: ch.name, vol: 0.8, pan: 0.5, mute: false, solo: false, fx: 0.0, vu: -100 };
 });
-let masterVol = 0.8, hpVol = 0.8, fxReturn = 0.0, masterVu = -100;
+let masterVol = 0.8, hpVol = 0.8, fxReturn = 0.0, masterVu = -100, masterVuL = -100, masterVuR = -100;
 
 // ─── Sampler state ─────────────────────────────────────────────────────────
 // Per slot een snapshot van wat de frontend moet weten. State (idle/recording/
@@ -421,7 +421,10 @@ vuServer.on("message", buf => {
   if (parts[0] === "list") parts.shift();
   if (parts[0] !== "vu" || parts.length < 3) return;
   const who = parts[1], val = parseFloat(parts[2]);
-  if (who === "master") masterVu = val;
+  // === BRIDGE-STEREO-VU-V1 ===
+  if (who === "masterL") { masterVuL = val; masterVu = (masterVuL + masterVuR) / 2; }
+  else if (who === "masterR") { masterVuR = val; masterVu = (masterVuL + masterVuR) / 2; }
+  else if (who === "master") masterVu = val;  // backward compat
   else { const idx = parseInt(who); if (state[idx]) state[idx].vu = val; }
   broadcastVU();
 });
@@ -460,7 +463,7 @@ function broadcast(obj) {
 }
 
 function broadcastVU() {
-  broadcast({ type: "vu", channels: CHANNELS.map(ch => ({ index: ch.index, vu: state[ch.index].vu })), masterVu });
+  broadcast({ type: "vu", channels: CHANNELS.map(ch => ({ index: ch.index, vu: state[ch.index].vu })), masterVu, masterVuL, masterVuR });
 }
 
 // ─── Frontend berichten ─────────────────────────────────────────────────────

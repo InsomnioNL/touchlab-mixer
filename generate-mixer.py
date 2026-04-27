@@ -129,50 +129,46 @@ def write_master(with_sampler_tap=False):
     """
     Master section.
 
-    VU fix: env~ has only one signal inlet, but the old version tried to
-    connect both L and R to it (resulting in a 'connection failed' warning
-    at load and an L-only VU in practice).  Here we sum L+R via [+~] and
-    halve via [*~ 0.5] before env~, giving a proper stereo-sum VU that
-    reads 0 dB for mono content and averages for uncorrelated stereo.
+    STEREO-VU-V1: twee aparte env~ chains voor masterVuL en masterVuR
+    i.p.v. een gesommeerde mono masterVu. Frontend toont stereo-VU
+    (twee balkjes met onafhankelijke beweging voor headphone L/R).
 
     Object map:
-        0-21 : base (catch~, *~, env~, dac~, hp chain, loadbang defaults)
-        22-23: VU stereo-sum (+~  and  *~ 0.5) — always present
-        24-27: sampler-tap chain (0.5×L, 0.5×R, +~, send~) — if enabled
+        0-9  : base L-chain (catch~ L+R, masterVol → *~ L, *~ R, env~ L,
+                 -100, s masterVuL, dac~ 1 2)
+        10-21: hpVol-chain + loadbang defaults
+        22-24: env~ R + -100 + s masterVuR (NIEUW)
+        25-28: sampler-tap chain (if enabled)
     """
-    # VU stereo-sum — always added, replaces the buggy direct-to-env~ wiring.
-    vu_sum_lines = (
-        "#X obj 130 150 +~;\n"          # obj 22: L + R
-        "#X obj 130 170 *~ 0.5;\n"      # obj 23: halve so mono = 0 dB VU
+    stereo_r_lines = (
+        "#X obj 80 190 env~;\n"        # obj 22: env~ R
+        "#X obj 80 210 - 100;\n"       # obj 23: -100
+        "#X obj 80 230 s masterVuR;\n" # obj 24: s masterVuR
     )
-    vu_sum_connects = (
-        "#X connect 5 0 22 0;\n"        # *~ L → sum inlet 0
-        "#X connect 6 0 22 1;\n"        # *~ R → sum inlet 1
-        "#X connect 22 0 23 0;\n"       # sum → halve
-        "#X connect 23 0 7 0;\n"        # halve → env~
+    stereo_r_connects = (
+        "#X connect 6 0 22 0;\n"       # *~ R → env~ R
+        "#X connect 22 0 23 0;\n"      # env~ R → -100
+        "#X connect 23 0 24 0;\n"      # -100 → s masterVuR
     )
 
     sampler_tap_lines = ""
     sampler_tap_connects = ""
     if with_sampler_tap:
-        # Sampler tap now lives at indices 24-27 (VU-sum took 22-23).
+        # Sampler tap nu op indices 25-28 (stereo-VU bezet 22-24).
         sampler_tap_lines = (
-            "#X obj 120 200 *~ 0.5;\n"          # obj 24
-            "#X obj 190 200 *~ 0.5;\n"          # obj 25
-            "#X obj 120 230 +~;\n"              # obj 26
-            "#X obj 120 260 send~ sampler-src-master;\n"  # obj 27
+            "#X obj 120 200 *~ 0.5;\n"          # obj 25
+            "#X obj 190 200 *~ 0.5;\n"          # obj 26
+            "#X obj 120 230 +~;\n"              # obj 27
+            "#X obj 120 260 send~ sampler-src-master;\n"  # obj 28
         )
         sampler_tap_connects = (
-            "#X connect 5 0 24 0;\n"
-            "#X connect 6 0 25 0;\n"
-            "#X connect 24 0 26 0;\n"
-            "#X connect 25 0 26 1;\n"
-            "#X connect 26 0 27 0;\n"
+            "#X connect 5 0 25 0;\n"
+            "#X connect 6 0 26 0;\n"
+            "#X connect 25 0 27 0;\n"
+            "#X connect 26 0 27 1;\n"
+            "#X connect 27 0 28 0;\n"
         )
 
-    # NOTE: the old buggy connects "#X connect 5 0 7 0" and
-    # "#X connect 6 0 7 1" are removed — env~ now gets its input from
-    # the VU-sum chain (obj 23).
     content = f"""\
 #N canvas 0 0 400 400 12;
 #X obj 10 20 catch~ masterL;
@@ -184,7 +180,7 @@ def write_master(with_sampler_tap=False):
 #X obj 80 130 *~;
 #X obj 10 190 env~;
 #X obj 10 210 - 100;
-#X obj 10 230 s masterVu;
+#X obj 10 230 s masterVuL;
 #X obj 10 270 dac~ 1 2;
 #X obj 220 60 r hpVol;
 #X obj 220 80 pack f 10;
@@ -197,12 +193,13 @@ def write_master(with_sampler_tap=False):
 #X obj 10 380 s masterVol;
 #X msg 90 360 0.8;
 #X obj 90 380 s hpVol;
-{vu_sum_lines}{sampler_tap_lines}#X connect 0 0 5 0;
+{{stereo_r_lines}}{{sampler_tap_lines}}#X connect 0 0 5 0;
 #X connect 1 0 6 0;
 #X connect 2 0 3 0;
 #X connect 3 0 4 0;
 #X connect 4 0 5 1;
 #X connect 4 0 6 1;
+#X connect 5 0 7 0;
 #X connect 5 0 10 0;
 #X connect 5 0 14 0;
 #X connect 6 0 10 1;
@@ -219,11 +216,17 @@ def write_master(with_sampler_tap=False):
 #X connect 17 0 20 0;
 #X connect 18 0 19 0;
 #X connect 20 0 21 0;
-{vu_sum_connects}{sampler_tap_connects}"""
+{{stereo_r_connects}}{{sampler_tap_connects}}"""
+    content = content.format(
+        stereo_r_lines=stereo_r_lines,
+        sampler_tap_lines=sampler_tap_lines,
+        stereo_r_connects=stereo_r_connects,
+        sampler_tap_connects=sampler_tap_connects,
+    )
     with open("master-section.pd", "w") as f:
         f.write(content)
     tag = " +sampler-tap" if with_sampler_tap else ""
-    print(f"  ✓  master-section.pd  (stereo-sum VU{tag})")
+    print(f"  ✓  master-section.pd  (stereo VU L/R{tag})")
 
 
 def write_vu_sender(channels, vu_host, vu_port, vu_ms):
@@ -256,11 +259,19 @@ def write_vu_sender(channels, vu_host, vu_port, vu_ms):
         lines.append(f"#X connect {p} 0 {s} 0;")
         y += 80
 
-    rm = add("#X obj 300 120 r masterVu;")
-    pm = add("#X obj 300 140 list prepend vu master;")
-    sm = add("#X obj 300 160 s vu-out;")
-    lines.append(f"#X connect {rm} 0 {pm} 0;")
-    lines.append(f"#X connect {pm} 0 {sm} 0;")
+    # === VUSENDER-STEREO-V1 ===
+    # Twee ketens voor stereo-VU: masterL en masterR. Frontend mapt
+    # die op sg-ml en sg-mr.
+    rml = add("#X obj 300 120 r masterVuL;")
+    pml = add("#X obj 300 140 list prepend vu masterL;")
+    sml = add("#X obj 300 160 s vu-out;")
+    lines.append(f"#X connect {rml} 0 {pml} 0;")
+    lines.append(f"#X connect {pml} 0 {sml} 0;")
+    rmr = add("#X obj 400 120 r masterVuR;")
+    pmr = add("#X obj 400 140 list prepend vu masterR;")
+    smr = add("#X obj 400 160 s vu-out;")
+    lines.append(f"#X connect {rmr} 0 {pmr} 0;")
+    lines.append(f"#X connect {pmr} 0 {smr} 0;")  # VUSENDER-STEREO-FIX-V1
 
     with open("vu-sender.pd", "w") as f:
         f.write("\n".join(lines) + "\n")
