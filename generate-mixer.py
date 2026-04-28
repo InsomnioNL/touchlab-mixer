@@ -11,6 +11,7 @@ Start:
 """
 import json, sys, os
 
+# === SAFETY-VOL-PD-V1: channel ===
 def write_channel(idx, name, with_sampler_tap=False):
     """Genereert ch1.pd, ch2.pd etc. — geen $1, alles hardcoded.
 
@@ -49,7 +50,7 @@ def write_channel(idx, name, with_sampler_tap=False):
 #X obj 320 260 - 100;
 #X obj 320 280 s ch{idx}-vu;
 #X obj 10 420 loadbang;
-#X msg 10 440 0.8;
+#X msg 10 440 0;
 #X obj 10 460 s ch{idx}-vol;
 #X msg 90 440 0.5;
 #X obj 90 460 s ch{idx}-pan;
@@ -125,6 +126,7 @@ def write_fx_bus():
     print("  ✓  fx-bus.pd")
 
 
+# === SAFETY-VOL-PD-V1: master-section ===
 def write_master(with_sampler_tap=False):
     """
     Master section.
@@ -195,9 +197,9 @@ def write_master(with_sampler_tap=False):
 #X obj 290 130 *~;
 #X obj 220 270 dac~ 3 4;
 #X obj 10 340 loadbang;
-#X msg 10 360 0.8;
+#X msg 10 360 0;
 #X obj 10 380 s masterVol;
-#X msg 90 360 0.8;
+#X msg 90 360 0;
 #X obj 90 380 s hpVol;
 {{stereo_r_lines}}{{sampler_tap_lines}}#X obj 45 160 master-pan;
 #X msg 170 360 0.5;

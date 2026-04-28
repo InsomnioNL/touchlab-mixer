@@ -21,7 +21,7 @@
 #X obj 320 260 - 100;
 #X obj 320 280 s ch2-vu;
 #X obj 10 420 loadbang;
-#X msg 10 440 0.8;
+#X msg 10 440 0;
 #X obj 10 460 s ch2-vol;
 #X msg 90 440 0.5;
 #X obj 90 460 s ch2-pan;

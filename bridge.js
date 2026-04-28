@@ -68,10 +68,12 @@ if (!fs.existsSync(SESSIONS_DIR)) fs.mkdirSync(SESSIONS_DIR, { recursive: true }
 // ─── State ─────────────────────────────────────────────────────────────────
 const state = {};
 CHANNELS.forEach(ch => {
-  state[ch.index] = { name: ch.name, vol: 0.8, pan: 0.5, mute: false, solo: false, fx: 0.0, vu: -100 };
+  // === SAFETY-VOL-V1: state ===
+    state[ch.index] = { name: ch.name, vol: 0, pan: 0.5, mute: false, solo: false, fx: 0.0, vu: -100 };
 });
 // === MASTER-PAN-BRIDGE-V1: state ===
-let masterVol = 0.8, hpVol = 0.8, masterPan = 0.5, fxReturn = 0.0, masterVu = -100, masterVuL = -100, masterVuR = -100;
+// === SAFETY-VOL-V1: master-decl ===
+let masterVol = 0, hpVol = 0, masterPan = 0.5, fxReturn = 0.0, masterVu = -100, masterVuL = -100, masterVuR = -100;
 
 // ─── Sampler state ─────────────────────────────────────────────────────────
 // Per slot een snapshot van wat de frontend moet weten. State (idle/recording/
@@ -224,13 +226,12 @@ function sendPD(receiver, ...args) {
 function initPD() {
   CHANNELS.forEach(ch => {
     const s = state[ch.index];
-    sendPD(`ch${ch.index}-vol`, s.vol);
+    // === SAFETY-VOL-V1: init ===
+    // ch${ch.index}-vol/masterVol/hpVol weggehaald: komen pas bij recall.
     sendPD(`ch${ch.index}-pan`, s.pan);
     sendPD(`ch${ch.index}-gate`, computeGate(ch.index));
     sendPD(`ch${ch.index}-fx`, s.fx);
   });
-  sendPD("masterVol", masterVol);
-  sendPD("hpVol", hpVol);
   sendPD("fxReturn", fxReturn);
   console.log("✓  Beginwaarden naar PD gestuurd");
   // Na mixer-init de TTB-samples laden in de sampler-slots

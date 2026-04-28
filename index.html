@@ -942,7 +942,8 @@ function saveMaster(){
 }
 function loadChannelMemory(ch){
   var m=lsLoad('ch_'+ch.index,null);
-  if(m){ch.vol=m.vol!==undefined?m.vol:ch.vol;ch.pan=m.pan!==undefined?m.pan:ch.pan;ch.fx=m.fx!==undefined?m.fx:ch.fx;ch.mute=m.mute!==undefined?m.mute:ch.mute;ch.solo=m.solo!==undefined?m.solo:ch.solo;}
+  // === SAFETY-VOL-UI-V1 === vol bewust niet uit localStorage bij opent
+  if(m){ch.pan=m.pan!==undefined?m.pan:ch.pan;ch.fx=m.fx!==undefined?m.fx:ch.fx;ch.mute=m.mute!==undefined?m.mute:ch.mute;ch.solo=m.solo!==undefined?m.solo:ch.solo;}
 }
 function loadMasterMemory(){
   var m=lsLoad('master',null);

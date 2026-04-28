@@ -17,9 +17,9 @@
 #X obj 290 130 *~;
 #X obj 220 270 dac~ 3 4;
 #X obj 10 340 loadbang;
-#X msg 10 360 0.8;
+#X msg 10 360 0;
 #X obj 10 380 s masterVol;
-#X msg 90 360 0.8;
+#X msg 90 360 0;
 #X obj 90 380 s hpVol;
 #X obj 80 190 env~;
 #X obj 80 210 - 100;
