@@ -278,6 +278,75 @@ def write_vu_sender(channels, vu_host, vu_port, vu_ms):
     print("  ✓  vu-sender.pd")
 
 
+# === FUDI-MIXER-ROUTER-V1: write_mixer_router ===
+def write_mixer_router(channels):
+    """Schrijf mixer-router.pd: [inlet] -> [route ...] -> {4N+3} sends.
+
+    Aangeroepen door generate(). Vervangt impliciete (en in Pd 0.55-2
+    gebroken) FUDI auto-routing achter netreceive 9000 door een
+    expliciete keten. Het host-patch heeft alleen [mixer-router] nodig
+    achter [netreceive 9000].
+
+    Selectors: per kanaal vol/pan/gate/fx, plus masterVol/hpVol/fxReturn.
+    Catch-all outlet -> [print mixer-unknown-fudi].
+
+    Layout: sends in een grid van max GRID_COLS kolommen, kolombreedte
+    en rijhoogte vast. Schaalt vanzelf met len(channels).
+    """
+    GRID_COLS = 5
+    COL_W = 170
+    ROW_H = 28
+    Y_INLET = 20
+    Y_ROUTE = 60
+    Y_SENDS_TOP = 110
+    X_LEFT = 20
+
+    selectors = []
+    for ch in channels:
+        idx = ch["index"]
+        selectors += [f"ch{idx}-vol", f"ch{idx}-pan",
+                      f"ch{idx}-gate", f"ch{idx}-fx"]
+    selectors += ["masterVol", "hpVol", "fxReturn"]
+
+    n_outlets = len(selectors)  # zonder catch-all
+    rows_needed = (n_outlets + GRID_COLS - 1) // GRID_COLS
+    canvas_w = max(450, X_LEFT + GRID_COLS * COL_W + 40)
+    canvas_h = Y_SENDS_TOP + (rows_needed + 2) * ROW_H + 40
+
+    lines = [f"#N canvas 0 0 {canvas_w} {canvas_h} 12;"]
+    n = [0]
+
+    def add(l):
+        lines.append(l)
+        i = n[0]
+        n[0] += 1
+        return i
+
+    inlet = add(f"#X obj {X_LEFT} {Y_INLET} inlet;")
+    route_args = " ".join(selectors)
+    route = add(f"#X obj {X_LEFT} {Y_ROUTE} route {route_args};")
+    lines.append(f"#X connect {inlet} 0 {route} 0;")
+
+    # Sends in grid
+    for i, sel in enumerate(selectors):
+        col = i % GRID_COLS
+        row = i // GRID_COLS
+        sx = X_LEFT + col * COL_W
+        sy = Y_SENDS_TOP + row * ROW_H
+        s = add(f"#X obj {sx} {sy} s {sel};")
+        lines.append(f"#X connect {route} {i} {s} 0;")
+
+    # Catch-all op laatste outlet (index n_outlets)
+    unk_y = Y_SENDS_TOP + (rows_needed + 1) * ROW_H
+    unk = add(f"#X obj {X_LEFT} {unk_y} print mixer-unknown-fudi;")
+    lines.append(f"#X connect {route} {n_outlets} {unk} 0;")
+
+    fname = "mixer-router.pd"
+    with open(fname, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"  ✓ {fname} ({n_outlets} routes + unknown)")
+
+
 def write_main(channels, osc_in_port, with_ttb=False, sampler_cfg=None):
     """Schrijf touchlab-mixer.pd (basic, zonder TTB).
 
@@ -299,6 +368,9 @@ def write_main(channels, osc_in_port, with_ttb=False, sampler_cfg=None):
     # OSC ontvangst voor mixer commands (TCP op 9000)
     nr  = add(f"#X obj 20 80 netreceive {osc_in_port};")
 
+    # === FUDI-MIXER-ROUTER-V1: write_main hookup ===
+    mr = add("#X obj 200 80 mixer-router;")
+    lines.append(f"#X connect {nr} 0 {mr} 0;")
     # Subpatches (als abstracties, zonder 'pd' prefix)
     fxb = add("#X obj 20 130 fx-bus;")
     ms  = add("#X obj 20 160 master-section;")
@@ -373,7 +445,10 @@ def write_main_ttb(channels, osc_in_port, sampler_cfg):
     dsp = add("#X msg 20 42 \\; pd dsp 1;")
     lines.append(f"#X connect {lb} 0 {dsp} 0;")
 
-    add(f"#X obj 20 80 netreceive {osc_in_port};")
+    # === FUDI-MIXER-ROUTER-V1: write_main_ttb hookup ===
+    mix_nr = add(f"#X obj 20 80 netreceive {osc_in_port};")
+    mix_mr = add("#X obj 200 80 mixer-router;")
+    lines.append(f"#X connect {mix_nr} 0 {mix_mr} 0;")
     add("#X obj 20 130 fx-bus;")
     add("#X obj 20 160 master-section;")
     add("#X obj 20 190 vu-sender;")
@@ -499,6 +574,8 @@ def generate(config_path):
     write_fx_bus()
     write_master(with_sampler_tap=ttb_enable)
     write_vu_sender(channels, vu_host, vu_port, vu_ms)
+    # === FUDI-MIXER-ROUTER-V1: generate() hookup ===
+    write_mixer_router(channels)
 
     # Always write basic mixer
     write_main(channels, osc_port, with_ttb=False)
@@ -510,8 +587,9 @@ def generate(config_path):
     print("Gegenereerde bestanden:")
     for ch in channels:
         print(f"  ch{ch['index']}.pd")
+    # === FUDI-MIXER-ROUTER-V1: file-list hookup ===
     base_files = ["fx-bus.pd", "master-section.pd", "vu-sender.pd",
-                  "touchlab-mixer.pd"]
+                  "mixer-router.pd", "touchlab-mixer.pd"]
     if ttb_enable:
         base_files.append("touchlab-mixer-ttb.pd")
     for f in base_files:
