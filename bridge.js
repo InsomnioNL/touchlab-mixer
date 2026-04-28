@@ -70,7 +70,8 @@ const state = {};
 CHANNELS.forEach(ch => {
   state[ch.index] = { name: ch.name, vol: 0.8, pan: 0.5, mute: false, solo: false, fx: 0.0, vu: -100 };
 });
-let masterVol = 0.8, hpVol = 0.8, fxReturn = 0.0, masterVu = -100, masterVuL = -100, masterVuR = -100;
+// === MASTER-PAN-BRIDGE-V1: state ===
+let masterVol = 0.8, hpVol = 0.8, masterPan = 0.5, fxReturn = 0.0, masterVu = -100, masterVuL = -100, masterVuR = -100;
 
 // ─── Sampler state ─────────────────────────────────────────────────────────
 // Per slot een snapshot van wat de frontend moet weten. State (idle/recording/
@@ -481,7 +482,7 @@ function handleFrontendMessage(msg, ws) {
     case "hpVol":     { hpVol=clamp(value,0,1); sendPD("hpVol",hpVol); broadcast({type:"hpVol",value:hpVol}); break; }
     case "fxReturn":  { fxReturn=clamp(value,0,1); sendPD("fxReturn",fxReturn); broadcast({type:"fxReturn",value:fxReturn}); break; }
     case "masterMute": { broadcast({type:"masterMute",value:!!value}); break; }
-    case "masterPan":  { broadcast({type:"masterPan",value}); break; }
+    case "masterPan":  { masterPan=clamp(value,0,1); sendPD("masterPan",masterPan); broadcast({type:"masterPan",value:masterPan}); break; } // === MASTER-PAN-BRIDGE-V1: handler ===
     // Opname (jack_capture)
     case "recStart":   { startRecording(); break; }
     case "recStop":    { stopRecording(); break; }
