@@ -145,8 +145,8 @@ def write_master(with_sampler_tap=False):
         "#X obj 80 210 - 100;\n"       # obj 23: -100
         "#X obj 80 230 s masterVuR;\n" # obj 24: s masterVuR
     )
+    # MASTER-PAN-V1: env~ R krijgt nu master-pan out R (29 1) i.p.v. 6 0
     stereo_r_connects = (
-        "#X connect 6 0 22 0;\n"       # *~ R → env~ R
         "#X connect 22 0 23 0;\n"      # env~ R → -100
         "#X connect 23 0 24 0;\n"      # -100 → s masterVuR
     )
@@ -161,14 +161,20 @@ def write_master(with_sampler_tap=False):
             "#X obj 120 230 +~;\n"              # obj 27
             "#X obj 120 260 send~ sampler-src-master;\n"  # obj 28
         )
+        # MASTER-PAN-V1: sampler-tap nu post-master-pan (29 0 / 29 1)
         sampler_tap_connects = (
-            "#X connect 5 0 25 0;\n"
-            "#X connect 6 0 26 0;\n"
+            "#X connect 29 0 25 0;\n"
+            "#X connect 29 1 26 0;\n"
             "#X connect 25 0 27 0;\n"
             "#X connect 26 0 27 1;\n"
             "#X connect 27 0 28 0;\n"
         )
 
+    # === MASTER-PAN-V1: write_master hookup ===
+    # MASTER-PAN-V1: master-pan op idx 29, loadbang-default op 30-31.
+    # *~ L/R (5/6) connecten nu naar master-pan; alle buses (env, dac,
+    # hpVol, sampler-tap) ontvangen van master-pan outputs i.p.v.
+    # rechtstreeks van *~ L/R.
     content = f"""\
 #N canvas 0 0 400 400 12;
 #X obj 10 20 catch~ masterL;
@@ -193,17 +199,23 @@ def write_master(with_sampler_tap=False):
 #X obj 10 380 s masterVol;
 #X msg 90 360 0.8;
 #X obj 90 380 s hpVol;
-{{stereo_r_lines}}{{sampler_tap_lines}}#X connect 0 0 5 0;
+{{stereo_r_lines}}{{sampler_tap_lines}}#X obj 45 160 master-pan;
+#X msg 170 360 0.5;
+#X obj 170 380 s masterPan;
+#X connect 0 0 5 0;
 #X connect 1 0 6 0;
 #X connect 2 0 3 0;
 #X connect 3 0 4 0;
 #X connect 4 0 5 1;
 #X connect 4 0 6 1;
-#X connect 5 0 7 0;
-#X connect 5 0 10 0;
-#X connect 5 0 14 0;
-#X connect 6 0 10 1;
-#X connect 6 0 15 0;
+#X connect 5 0 29 0;
+#X connect 6 0 29 1;
+#X connect 29 0 7 0;
+#X connect 29 0 10 0;
+#X connect 29 0 14 0;
+#X connect 29 1 10 1;
+#X connect 29 1 15 0;
+#X connect 29 1 22 0;
 #X connect 7 0 8 0;
 #X connect 8 0 9 0;
 #X connect 11 0 12 0;
@@ -216,6 +228,8 @@ def write_master(with_sampler_tap=False):
 #X connect 17 0 20 0;
 #X connect 18 0 19 0;
 #X connect 20 0 21 0;
+#X connect 17 0 30 0;
+#X connect 30 0 31 0;
 {{stereo_r_connects}}{{sampler_tap_connects}}"""
     content = content.format(
         stereo_r_lines=stereo_r_lines,
@@ -306,7 +320,8 @@ def write_mixer_router(channels):
         idx = ch["index"]
         selectors += [f"ch{idx}-vol", f"ch{idx}-pan",
                       f"ch{idx}-gate", f"ch{idx}-fx"]
-    selectors += ["masterVol", "hpVol", "fxReturn"]
+    # === MASTER-PAN-V1: mixer-router selector ===
+    selectors += ["masterVol", "masterPan", "hpVol", "fxReturn"]
 
     n_outlets = len(selectors)  # zonder catch-all
     rows_needed = (n_outlets + GRID_COLS - 1) // GRID_COLS
@@ -345,6 +360,63 @@ def write_mixer_router(channels):
     with open(fname, "w") as f:
         f.write("\n".join(lines) + "\n")
     print(f"  ✓ {fname} ({n_outlets} routes + unknown)")
+
+
+# === MASTER-PAN-V1: write_master_pan ===
+def write_master_pan():
+    """Schrijf master-pan.pd: 2-in 2-out abstractie met masterPan-receive.
+
+    Optie C (mono-folddown-met-bias). Pan in [0, 1]:
+      pan=0.0 -> out_L = L+R, out_R = 0       (links: complete mix in L)
+      pan=0.5 -> out_L = L,   out_R = R       (midden: ongewijzigde stereo)
+      pan=1.0 -> out_L = 0,   out_R = L+R     (rechts: complete mix in R)
+
+    Default-waarde voor masterPan wordt door master-section.pd gezet
+    (loadbang 0.5).
+    """
+    content = """\
+#N canvas 0 0 600 400 12;
+#X obj 30 30 inlet~;
+#X obj 130 30 inlet~;
+#X obj 250 30 r masterPan;
+#X obj 250 60 pack f 10;
+#X obj 250 80 line~;
+#X obj 250 110 expr~ ($v1<=0.5)+(($v1>0.5)*(2-2*$v1));
+#X obj 380 110 expr~ ($v1<=0.5)*(1-2*$v1);
+#X obj 510 110 expr~ ($v1>0.5)*(2*$v1-1);
+#X obj 250 150 expr~ ($v1<=0.5)*(2*$v1)+($v1>0.5);
+#X obj 30 200 *~;
+#X obj 130 200 *~;
+#X obj 230 200 *~;
+#X obj 330 200 *~;
+#X obj 30 270 +~;
+#X obj 230 270 +~;
+#X obj 30 320 outlet~;
+#X obj 230 320 outlet~;
+#X connect 0 0 9 0;
+#X connect 0 0 11 0;
+#X connect 1 0 10 0;
+#X connect 1 0 12 0;
+#X connect 2 0 3 0;
+#X connect 3 0 4 0;
+#X connect 4 0 5 0;
+#X connect 4 0 6 0;
+#X connect 4 0 7 0;
+#X connect 4 0 8 0;
+#X connect 5 0 9 1;
+#X connect 6 0 10 1;
+#X connect 7 0 11 1;
+#X connect 8 0 12 1;
+#X connect 9 0 13 0;
+#X connect 10 0 13 1;
+#X connect 11 0 14 0;
+#X connect 12 0 14 1;
+#X connect 13 0 15 0;
+#X connect 14 0 16 0;
+"""
+    with open("master-pan.pd", "w") as f:
+        f.write(content)
+    print("  ✓  master-pan.pd")
 
 
 def write_main(channels, osc_in_port, with_ttb=False, sampler_cfg=None):
@@ -573,6 +645,8 @@ def generate(config_path):
 
     write_fx_bus()
     write_master(with_sampler_tap=ttb_enable)
+    # === MASTER-PAN-V1: generate() hookup ===
+    write_master_pan()
     write_vu_sender(channels, vu_host, vu_port, vu_ms)
     # === FUDI-MIXER-ROUTER-V1: generate() hookup ===
     write_mixer_router(channels)
@@ -588,8 +662,9 @@ def generate(config_path):
     for ch in channels:
         print(f"  ch{ch['index']}.pd")
     # === FUDI-MIXER-ROUTER-V1: file-list hookup ===
-    base_files = ["fx-bus.pd", "master-section.pd", "vu-sender.pd",
-                  "mixer-router.pd", "touchlab-mixer.pd"]
+    # === MASTER-PAN-V1: file-list hookup ===
+    base_files = ["fx-bus.pd", "master-section.pd", "master-pan.pd",
+                  "vu-sender.pd", "mixer-router.pd", "touchlab-mixer.pd"]
     if ttb_enable:
         base_files.append("touchlab-mixer-ttb.pd")
     for f in base_files:
