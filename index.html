@@ -947,7 +947,8 @@ function loadChannelMemory(ch){
 }
 function loadMasterMemory(){
   var m=lsLoad('master',null);
-  if(m) return {vol:m.vol||0.8,pan:m.pan||0.5,fxReturn:m.fxReturn||0};
+  // === LOADMASTER-NULLISH-V1 === ?? ipv || zodat opgeslagen 0 niet door fallback wordt vervangen
+  if(m) return {vol:m.vol??0,pan:m.pan??0.5,fxReturn:m.fxReturn??0};
   return null;
 }
 const SEGS=22,BANK_SIZE=10,PAD=4;
