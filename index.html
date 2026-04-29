@@ -1396,13 +1396,17 @@ function buildMasterFader(){
 // ── Divider knobs init ─────────────────────────────────────────────────────
 function initDividerKnobs(){
   var mpk=document.getElementById('kn-m-pan');
-  if(mpk&&!mpk.querySelector('svg')) mpk.dataset.default=0.5;mpk.dataset.currentVal=master.pan||.5;
+  if(mpk&&!mpk.querySelector('svg')) { // === DIVIDER-KNOBS-BRACES-V1 === braces toegevoegd
+    mpk.dataset.default=0.5;mpk.dataset.currentVal=master.pan||.5;
     initK(mpk,master.pan||.5,26,function(v){master.pan=v;mpk.dataset.currentVal=v;send({type:'masterPan',value:v});saveMaster();},'green');
     attachPopup(mpk,'pan',function(){return parseFloat(mpk.dataset.currentVal||'0.5');},function(v){master.pan=v;mpk.dataset.currentVal=v;var ln2=mpk.querySelector('line');if(ln2)setKL(ln2,v,26);send({type:'masterPan',value:v});saveMaster();});
+  }
   var mfx=document.getElementById('kn-m-fx');
-  if(mfx&&!mfx.querySelector('svg')) mfx.dataset.default=0;mfx.dataset.currentVal=master.fxReturn||0;
+  if(mfx&&!mfx.querySelector('svg')) {
+    mfx.dataset.default=0;mfx.dataset.currentVal=master.fxReturn||0;
     initK(mfx,master.fxReturn||0,26,function(v){master.fxReturn=v;mfx.dataset.currentVal=v;send({type:'fxReturn',value:v});saveMaster();},'purple');
     attachPopup(mfx,'fx',function(){return parseFloat(mfx.dataset.currentVal||'0');},function(v){master.fxReturn=v;mfx.dataset.currentVal=v;var ln2=mfx.querySelector('line');if(ln2)setKL(ln2,v,26);send({type:'fxReturn',value:v});saveMaster();});
+  }
   // Mute button master
   var mmb=document.getElementById('btn-m-mute');
   if(!mmb){
