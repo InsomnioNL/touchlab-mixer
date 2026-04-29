@@ -1467,7 +1467,9 @@ function renderAll(){
     tabs.classList.add('visible');
     document.getElementById('tab-a').textContent='1–'+BANK_SIZE;
     document.getElementById('tab-b').textContent=(BANK_SIZE+1)+'–'+Math.min(N,20);
-  } else tabs.classList.remove('visible');
+  } else { // === ELSE-BRACES-BANKTABS-V1 === accolades voor symmetrie met if-tak
+    tabs.classList.remove('visible');
+  }
   renderStrips();
   setBank(currentBank);
   if(document.getElementById('live')&&!document.getElementById('live').classList.contains('hidden')){
