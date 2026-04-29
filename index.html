@@ -1376,6 +1376,11 @@ function buildMasterFader(){
   // Thumb over L+R heen
   var thumb=document.createElement('div');thumb.className='fvu-thumb';thumb.id='th-m';
   var line=document.createElement('div');line.className='fvu-line';thumb.appendChild(line);
+  // === MASTERFADER-DIGIT-V1 === %-readout op master-thumb (channel-fader patroon)
+  var digit=document.createElement('div');digit.className='fvu-digit';digit.id='dig-m';
+  digit.textContent=Math.round(master.vol*100)+'%';
+  digit.style.top=master.vol>0.85?'18px':'-16px';
+  thumb.appendChild(digit);
   thumb.style.top=((1-master.vol)*R+PAD+6.5)+'px';
 
   wrap.appendChild(segsL);
@@ -1385,7 +1390,7 @@ function buildMasterFader(){
 
   var drag=false,sy=0,sv=master.vol;
   function dn(y){drag=true;sy=y;sv=1-(parseFloat(thumb.style.top)-PAD-6.5)/R;}
-  function mv(y){if(!drag)return;var v=Math.max(0,Math.min(1,sv+(sy-y)/R));thumb.style.top=((1-v)*R+PAD+6.5)+'px';master.vol=v;send({type:'masterVol',value:v});saveMaster();}
+  function mv(y){if(!drag)return;var v=Math.max(0,Math.min(1,sv+(sy-y)/R));thumb.style.top=((1-v)*R+PAD+6.5)+'px';var d=document.getElementById('dig-m');if(d){d.textContent=Math.round(v*100)+'%';d.style.top=v>0.85?'18px':'-16px';}master.vol=v;send({type:'masterVol',value:v});saveMaster();}
   wrap.addEventListener('mousedown',e=>{dn(e.clientY);e.preventDefault();});
   wrap.addEventListener('touchstart',e=>{dn(e.touches[0].clientY);e.preventDefault();},{passive:false});
   window.addEventListener('mousemove',e=>mv(e.clientY));
