@@ -227,6 +227,7 @@
 #X text 900 750 TTB-OUT-SLOT-1-V1;
 #X obj 900 770 throw~ ttb-bus-L;
 #X obj 900 790 throw~ ttb-bus-R;
+#X text 700 785 TTB-MONITOR-SLOT-V1;
 #X connect 2 0 3 0;
 #X connect 3 0 16 0;
 #X connect 3 0 175 0;
@@ -426,8 +427,6 @@
 #X connect 209 0 210 0;
 #X connect 210 0 211 0;
 #X connect 211 0 212 1;
-#X connect 212 0 97 0;
-#X connect 212 0 97 1;
 #X connect 214 0 215 0;
 #X connect 215 0 216 0;
 #X connect 216 0 217 0;
