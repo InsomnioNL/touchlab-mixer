@@ -1,6 +1,6 @@
 #N canvas 0 0 910 318 12;
 #X obj 20 20 inlet;
-#X obj 20 60 route ch1-vol ch1-pan ch1-gate ch1-fx ch2-vol ch2-pan ch2-gate ch2-fx ch3-vol ch3-pan ch3-gate ch3-fx ch4-vol ch4-pan ch4-gate ch4-fx masterVol masterPan hpVol fxReturn;
+#X obj 20 60 route ch1-vol ch1-pan ch1-gate ch1-fx ch2-vol ch2-pan ch2-gate ch2-fx ch3-vol ch3-pan ch3-gate ch3-fx ch4-vol ch4-pan ch4-gate ch4-fx masterVol masterPan hpVol fxReturn ttb-route-local ttb-route-live;
 #X connect 0 0 1 0;
 #X obj 20 110 s ch1-vol;
 #X connect 1 0 2 0;
@@ -43,4 +43,9 @@
 #X obj 700 194 s fxReturn;
 #X connect 1 19 21 0;
 #X obj 20 250 print mixer-unknown-fudi;
-#X connect 1 20 22 0;
+#X obj 250 280 s ttb-route-local;
+#X connect 1 20 23 0;
+#X obj 480 280 s ttb-route-live;
+#X connect 1 21 24 0;
+#X text 600 20 TTB-ROUTE-MIXER-ROUTER-V1;
+#X connect 1 22 22 0;

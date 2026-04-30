@@ -522,6 +522,40 @@ html,body{
   color:rgba(255,255,255,0.95);
   cursor:default;
 }
+/* === TTB-ROUTE-RC-V1: rocker styling === */
+.ttb-route-twin{
+  display:flex;
+  border-radius:4px;overflow:hidden;
+  border:1px solid rgba(176,106,245,0.3);
+  flex-shrink:0;
+}
+.ttb-route-half{
+  background:rgba(176,106,245,0.05);
+  color:rgba(176,106,245,0.5);
+  font-size:10px;font-family:var(--mono);letter-spacing:.1em;
+  cursor:pointer;padding:3px 9px;line-height:1;
+  border:0;
+  transition:all .15s;
+}
+.ttb-route-half:not(.active):hover{
+  background:rgba(176,106,245,0.15);
+  color:rgba(176,106,245,0.9);
+}
+.ttb-route-half.active{
+  background:rgba(240,185,58,0.3);
+  color:rgba(255,255,255,0.95);
+  cursor:default;
+}
+.ttb-popup.route-local{
+  border:2px solid var(--red);
+  box-shadow:0 0 12px rgba(224,82,82,0.4);
+  animation:ttb-route-local-pulse 3.5s ease-in-out infinite;
+}
+@keyframes ttb-route-local-pulse{
+  0%,100%{box-shadow:0 0 8px rgba(224,82,82,0.25);}
+  50%{box-shadow:0 0 18px rgba(224,82,82,0.55);}
+}
+
 /* Edit-mode action buttons */
 .ttb-edit-action{
   background:rgba(176,106,245,0.1);border:1px solid rgba(176,106,245,0.3);
@@ -1983,6 +2017,21 @@ function handleSamplerStatus(msg){
   else btn.classList.remove('playing');
 }
 
+// === TTB-ROUTE-RC-V1: init ===
+document.addEventListener('DOMContentLoaded', function(){
+  // Stuur default route 'live' naar bridge bij UI-load.
+  // Bridge stuurt dat door als ttb-route-live=1, ttb-route-local=0.
+  // Pd's loadbang zet dezelfde state al, dus geen audio-effect.
+  var trySend = function(){
+    if (ws && ws.readyState === 1) {
+      send({type:'ttbRoute', value:ttbRoute});
+    } else {
+      setTimeout(trySend, 200);
+    }
+  };
+  setTimeout(trySend, 500);
+});
+
 // Fader-listener (master volume)
 document.addEventListener('DOMContentLoaded', function(){
   var fad = document.getElementById('ttb-fader');
@@ -2124,6 +2173,21 @@ function setTTBMode(newMode){
 // Backwards-compat — sommige flows roepen toggleTTBMode aan
 function toggleTTBMode(){
   setTTBMode(ttbMode === 'perf' ? 'edit' : 'perf');
+}
+
+// === TTB-ROUTE-RC-V1: rocker JS ===
+var ttbRoute = 'live'; // 'local' | 'live'
+function setTTBRoute(newRoute){
+  if (newRoute !== 'local' && newRoute !== 'live') return;
+  if (newRoute === ttbRoute) return;
+  ttbRoute = newRoute;
+  var pop = document.getElementById('ttb-popup');
+  if (pop) pop.classList.toggle('route-local', ttbRoute === 'local');
+  var btnLocal = document.getElementById('ttb-route-local-btn');
+  var btnLive  = document.getElementById('ttb-route-live-btn');
+  if (btnLocal) btnLocal.classList.toggle('active', ttbRoute === 'local');
+  if (btnLive)  btnLive.classList.toggle('active',  ttbRoute === 'live');
+  send({type:'ttbRoute', value:ttbRoute});
 }
 
 function renderEditView(){
@@ -2498,6 +2562,11 @@ function recordQueueTap(slotNum){
   <div class="ttb-popup-header" id="ttb-header">
     <div class="ttb-popup-title">TAP TAP BOOM</div>
     <div class="ttb-header-controls">
+      <!-- === TTB-ROUTE-ROCKER-V1 === -->
+      <div class="ttb-route-twin" id="ttb-route-twin">
+        <button class="ttb-route-half" id="ttb-route-local-btn" onclick="setTTBRoute('local')">LOCAL</button>
+        <button class="ttb-route-half active" id="ttb-route-live-btn" onclick="setTTBRoute('live')">LIVE</button>
+      </div>
       <div class="ttb-mode-twin">
         <button class="ttb-mode-half active" id="ttb-mode-play" onclick="setTTBMode('perf')">PLAY</button>
         <button class="ttb-mode-half" id="ttb-mode-edit" onclick="setTTBMode('edit')">EDIT</button>

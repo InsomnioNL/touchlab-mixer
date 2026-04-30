@@ -514,6 +514,17 @@ function handleFrontendMessage(msg, ws) {
       broadcast({ type: "samplerMasterVol", value: v });
       break;
     }
+    // === TTB-ROUTE-BRIDGE-V1 ===
+    case "ttbRoute": {
+      // value: local | live - mutually exclusive route-switch
+      const route = (msg.value === "local") ? "local" : "live";
+      const localOn = (route === "local") ? 1 : 0;
+      const liveOn  = (route === "live")  ? 1 : 0;
+      sendPD("ttb-route-local", localOn);
+      sendPD("ttb-route-live",  liveOn);
+      broadcast({ type: "ttbRoute", value: route });
+      break;
+    }
     case "samplerSpeed": {
       const v = clamp(msg.value, 0.1, 4);
       if (samplerState[msg.slot]) samplerState[msg.slot].speed = v;
