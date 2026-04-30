@@ -2018,6 +2018,11 @@ function handleSamplerStatus(msg){
   if (msg.state === 'playing' || msg.state === 'idle') {
     intendedStates[msg.slot] = msg.state;
   }
+  /* WAVEFORM-PLAYHEAD-V1: animate playhead for active edit slot */
+  if (ttbMode === 'edit' && msg.slot === ttbActiveSlot) {
+    if (msg.state === 'playing') startPlayhead(msg.slot);
+    else if (msg.state === 'idle') stopPlayhead();
+  }
   var btn = document.querySelector('.ttb-trigger[data-slot="'+msg.slot+'"]');
   if (!btn) return;
   if (msg.state === 'playing') btn.classList.add('playing');
@@ -2048,6 +2053,9 @@ function _getAudioCtx(){
   return _waveformAudioCtx;
 }
 function clearWaveform(){
+  /* WAVEFORM-PLAYHEAD-V1: stop playhead loop on clear */
+  if (_playheadRAF) { cancelAnimationFrame(_playheadRAF); _playheadRAF = null; }
+  _currentAudioBuffer = null;
   var area = document.getElementById('ttb-wave-area');
   if (area) area.classList.remove('has-sample');
   var canvas = document.getElementById('ttb-wave-canvas');
@@ -2065,7 +2073,59 @@ function drawWaveform(filename){
     .then(function(audio){ _renderPeaks(audio); })
     .catch(function(err){ console.warn('waveform load failed:', err); clearWaveform(); });
 }
+// === WAVEFORM-PLAYHEAD-V1: playback cursor ===
+var _currentAudioBuffer = null;
+var _playheadRAF = null;
+var _playheadStartTime = 0;
+var _playheadSlot = null;
+function _getPlaySpeed(){
+  var s = (typeof ttbSlots !== 'undefined' && _playheadSlot != null) ?
+    ttbSlots.find(function(x){ return x.slot === _playheadSlot; }) : null;
+  return (s && s.speed) ? s.speed : 1.0;
+}
+function startPlayhead(slot){
+  if (!_currentAudioBuffer) return;
+  if (_playheadRAF) cancelAnimationFrame(_playheadRAF);
+  _playheadSlot = slot;
+  _playheadStartTime = performance.now();
+  _playheadRAF = requestAnimationFrame(_drawPlayhead);
+}
+function stopPlayhead(){
+  if (_playheadRAF) { cancelAnimationFrame(_playheadRAF); _playheadRAF = null; }
+  _playheadSlot = null;
+  /* Hertekenen zonder cursor */
+  if (_currentAudioBuffer) _renderPeaks(_currentAudioBuffer);
+}
+function _drawPlayhead(){
+  if (!_currentAudioBuffer) { _playheadRAF = null; return; }
+  var canvas = document.getElementById('ttb-wave-canvas');
+  if (!canvas) { _playheadRAF = null; return; }
+  /* Re-render statische waveform first */
+  _renderPeaksOnly(_currentAudioBuffer);
+  /* Compute current playback position */
+  var elapsedSec = (performance.now() - _playheadStartTime) / 1000;
+  var speed = _getPlaySpeed();
+  var positionSec = elapsedSec * speed;
+  var duration = _currentAudioBuffer.duration;
+  if (positionSec >= duration) {
+    /* Past end: stop loop, render statisch */
+    _playheadRAF = null;
+    return;
+  }
+  var x = (positionSec / duration) * canvas.width;
+  var ctx = canvas.getContext('2d');
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, 0);
+  ctx.lineTo(x, canvas.height);
+  ctx.stroke();
+  _playheadRAF = requestAnimationFrame(_drawPlayhead);
+}
+
 function _renderPeaks(audioBuffer){
+  /* WAVEFORM-PLAYHEAD-V1: cache buffer for re-render during playback */
+  _currentAudioBuffer = audioBuffer;
   var canvas = document.getElementById('ttb-wave-canvas');
   var area = document.getElementById('ttb-wave-area');
   if (!canvas || !area) return;
@@ -2099,6 +2159,36 @@ function _renderPeaks(audioBuffer){
   }
   ctx.stroke();
   area.classList.add('has-sample');
+}
+/* WAVEFORM-PLAYHEAD-V1: alias zonder cache-side-effects voor render-loop */
+function _renderPeaksOnly(audioBuffer){
+  var canvas = document.getElementById('ttb-wave-canvas');
+  var area = document.getElementById('ttb-wave-area');
+  if (!canvas || !area) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  var ch0 = audioBuffer.getChannelData(0);
+  var ch1 = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : null;
+  var samplesPerPixel = Math.max(1, Math.floor(audioBuffer.length / W));
+  ctx.strokeStyle = 'rgba(176,106,245,0.85)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (var x = 0; x < W; x++) {
+    var start = x * samplesPerPixel;
+    var end = Math.min(start + samplesPerPixel, audioBuffer.length);
+    var min = 1.0, max = -1.0;
+    for (var i = start; i < end; i++) {
+      var v = ch1 ? (ch0[i] + ch1[i]) * 0.5 : ch0[i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    var yMin = ((1 - min) * 0.5) * H;
+    var yMax = ((1 - max) * 0.5) * H;
+    ctx.moveTo(x + 0.5, yMin);
+    ctx.lineTo(x + 0.5, yMax);
+  }
+  ctx.stroke();
 }
 
 // Fader-listener (master volume)
