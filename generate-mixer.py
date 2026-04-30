@@ -127,7 +127,7 @@ def write_fx_bus():
 
 
 # === SAFETY-VOL-PD-V1: master-section ===
-def write_master(with_sampler_tap=False):
+def write_master(with_sampler_tap=False, with_ttb_out=False):  # ABSORB-TTB-OUT-V1
     """
     Master section.
 
@@ -178,7 +178,7 @@ def write_master(with_sampler_tap=False):
     # hpVol, sampler-tap) ontvangen van master-pan outputs i.p.v.
     # rechtstreeks van *~ L/R.
     content = f"""\
-#N canvas 0 0 400 400 12;
+#N canvas 0 0 717 562 12;
 #X obj 10 20 catch~ masterL;
 #X obj 80 20 catch~ masterR;
 #X obj 10 60 r masterVol;
@@ -195,7 +195,7 @@ def write_master(with_sampler_tap=False):
 #X obj 220 100 line~;
 #X obj 220 130 *~;
 #X obj 290 130 *~;
-#X obj 220 270 dac~ 3 4;
+#X obj 312 273 dac~ 3 4;
 #X obj 10 340 loadbang;
 #X msg 10 360 0;
 #X obj 10 380 s masterVol;
@@ -204,7 +204,7 @@ def write_master(with_sampler_tap=False):
 {{stereo_r_lines}}{{sampler_tap_lines}}#X obj 45 160 master-pan;
 #X msg 170 360 0.5;
 #X obj 170 380 s masterPan;
-#X connect 0 0 5 0;
+{{ttb_out_lines}}#X connect 0 0 5 0;
 #X connect 1 0 6 0;
 #X connect 2 0 3 0;
 #X connect 3 0 4 0;
@@ -232,12 +232,61 @@ def write_master(with_sampler_tap=False):
 #X connect 20 0 21 0;
 #X connect 17 0 30 0;
 #X connect 30 0 31 0;
-{{stereo_r_connects}}{{sampler_tap_connects}}"""
+{{stereo_r_connects}}{{sampler_tap_connects}}{{ttb_out_connects}}"""
+    # ABSORB-TTB-OUT-V1
+    ttb_out_lines = ""
+    ttb_out_connects = ""
+    if with_ttb_out:
+        ttb_out_lines = (
+            "#X text 390 240 TTB-OUT-PATCH-V1;\n"
+            "#X obj 390 260 catch~ ttb-bus-L;\n"
+            "#X obj 390 285 catch~ ttb-bus-R;\n"
+            "#X text 390 320 TTB-MONITOR-V1;\n"
+            "#X obj 390 340 r ttb-route-live;\n"
+            "#X obj 390 360 pack f 10;\n"
+            "#X obj 390 380 line~;\n"
+            "#X obj 390 400 *~;\n"
+            "#X obj 460 400 *~;\n"
+            "#X obj 390 460 r ttb-route-local;\n"
+            "#X obj 390 480 pack f 10;\n"
+            "#X obj 390 500 line~;\n"
+            "#X obj 390 520 *~;\n"
+            "#X obj 460 520 *~;\n"
+            "#X obj 540 340 loadbang;\n"
+            "#X msg 540 360 1;\n"
+            "#X obj 540 380 s ttb-route-live;\n"
+            "#X msg 620 360 0;\n"
+            "#X obj 620 380 s ttb-route-local;\n"
+        )
+        ttb_out_connects = (
+            "#X connect 36 0 37 0;\n"
+            "#X connect 37 0 38 0;\n"
+            "#X connect 38 0 39 1;\n"
+            "#X connect 38 0 40 1;\n"
+            "#X connect 33 0 39 0;\n"
+            "#X connect 34 0 40 0;\n"
+            "#X connect 39 0 16 0;\n"
+            "#X connect 40 0 16 1;\n"
+            "#X connect 41 0 42 0;\n"
+            "#X connect 42 0 43 0;\n"
+            "#X connect 43 0 44 1;\n"
+            "#X connect 43 0 45 1;\n"
+            "#X connect 33 0 44 0;\n"
+            "#X connect 34 0 45 0;\n"
+            "#X connect 44 0 10 0;\n"
+            "#X connect 45 0 10 1;\n"
+            "#X connect 46 0 47 0;\n"
+            "#X connect 47 0 48 0;\n"
+            "#X connect 46 0 49 0;\n"
+            "#X connect 49 0 50 0;\n"
+        )
     content = content.format(
         stereo_r_lines=stereo_r_lines,
         sampler_tap_lines=sampler_tap_lines,
+        ttb_out_lines=ttb_out_lines,
         stereo_r_connects=stereo_r_connects,
         sampler_tap_connects=sampler_tap_connects,
+        ttb_out_connects=ttb_out_connects,
     )
     with open("master-section.pd", "w") as f:
         f.write(content)
@@ -646,7 +695,7 @@ def generate(config_path):
         write_channel(ch["index"], ch["name"], with_sampler_tap=ttb_enable)
 
     write_fx_bus()
-    write_master(with_sampler_tap=ttb_enable)
+    write_master(with_sampler_tap=ttb_enable, with_ttb_out=ttb_enable)
     # === MASTER-PAN-V1: generate() hookup ===
     write_master_pan()
     write_vu_sender(channels, vu_host, vu_port, vu_ms)
