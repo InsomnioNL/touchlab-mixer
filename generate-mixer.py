@@ -667,6 +667,17 @@ def write_main_ttb(channels, osc_in_port, sampler_cfg):
             sx, sy = 463, 428 + (i - 7) * 23
         add(f"#X obj {sx} {sy} sampler-slot-{i + 1};")
 
+    # ABSORB-SAMPLER-MASTER-VOL-DEFAULT-V1
+    # Without this loadbang, sampler-master-vol stays at Pd's float-default 0
+    # at startup. The bridge's "Beginwaarden" init does not include this
+    # variable, so TTB samples are silent until the user moves the master
+    # sample fader. UI defaults to 1, so we set Pd's default to match.
+    smv_lb = add("#X obj 2000 1300 loadbang;")
+    smv_msg = add('#X msg 2000 1325 1;')
+    smv_send = add("#X obj 2000 1350 s sampler-master-vol;")
+    lines.append(f"#X connect {smv_lb} 0 {smv_msg} 0;")
+    lines.append(f"#X connect {smv_msg} 0 {smv_send} 0;")
+
     fname = "touchlab-mixer-ttb.pd"
     with open(fname, "w") as f:
         f.write("\n".join(lines) + "\n")
