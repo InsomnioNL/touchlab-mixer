@@ -1276,13 +1276,45 @@ function initK(el,val,size,cb,color){
   var drag=false,sy=0,sv=val;
   el.addEventListener('mousedown',e=>{drag=true;sy=e.clientY;sv=val;e.preventDefault()});
   el.addEventListener('touchstart',e=>{drag=true;sy=e.touches[0].clientY;sv=val;e.preventDefault()},{passive:false});
-  window.addEventListener('mousemove',e=>{if(!drag)return;val=Math.max(0,Math.min(1,sv+(sy-e.clientY)/120));setKL(ln,val,size);if(cb)cb(val)});
-  window.addEventListener('touchmove',e=>{if(!drag)return;val=Math.max(0,Math.min(1,sv+(sy-e.touches[0].clientY)/120));setKL(ln,val,size);if(cb)cb(val)},{passive:false});
+  window.addEventListener('mousemove',e=>{
+    if(!drag)return;
+    val=Math.max(0,Math.min(1,sv+(sy-e.clientY)/120));
+    setKL(ln,val,size);
+    if(cb)cb(val);
+    // POPUP-SYNC-DRAG-V1: sync popup if open on this element
+    if(popupTarget===el){
+      var pf=document.getElementById('popup-fader');
+      if(pf){pf.value=val*100;}
+      updatePopupVal(val,popupType);
+    }
+  });
+  window.addEventListener('touchmove',e=>{
+    if(!drag)return;
+    val=Math.max(0,Math.min(1,sv+(sy-e.touches[0].clientY)/120));
+    setKL(ln,val,size);
+    if(cb)cb(val);
+    // POPUP-SYNC-DRAG-V1: sync popup if open on this element
+    if(popupTarget===el){
+      var pf=document.getElementById('popup-fader');
+      if(pf){pf.value=val*100;}
+      updatePopupVal(val,popupType);
+    }
+  },{passive:false});
   window.addEventListener('mouseup',()=>drag=false);window.addEventListener('touchend',()=>drag=false);
   // Dubbeltap/dubbelklik → reset naar default
   var lastTap=0;
   var def=el.dataset.default!==undefined?parseFloat(el.dataset.default):0;
-  function resetK(e){e.preventDefault();e.stopPropagation();val=def;setKL(ln,val,size);if(cb)cb(val);}
+  function resetK(e){
+    e.preventDefault();e.stopPropagation();
+    val=def;setKL(ln,val,size);
+    if(cb)cb(val);
+    // POPUP-SYNC-RESETK-V1: sync popup if open on this element
+    if(popupTarget===el){
+      var pf=document.getElementById('popup-fader');
+      if(pf){pf.value=val*100;}
+      updatePopupVal(val,popupType);
+    }
+  }
   el.addEventListener('dblclick',function(e){e.stopPropagation();resetK(e);});
   el.addEventListener('touchend',function(e){
     if(drag)return;
