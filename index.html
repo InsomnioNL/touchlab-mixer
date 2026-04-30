@@ -655,6 +655,11 @@ html,body{
 }
 .ttb-trim-marker.start{left:5%;}
 .ttb-trim-marker.end{right:5%;}
+/* === WAVEFORM-FASE1-V1: canvas + empty stacking === */
+.ttb-wave-area{position:relative;}
+.ttb-wave-canvas{display:none;width:100%;height:100%;}
+.ttb-wave-area.has-sample .ttb-wave-canvas{display:block;}
+.ttb-wave-area.has-sample .ttb-wave-empty{display:none;}
 
 .ttb-transport{
   display:flex;gap:6px;margin-bottom:12px;
@@ -1024,6 +1029,8 @@ function connect(url){
         if(btn)btn.classList.remove('active');
         if(msg.file){
           recFile=msg.file;
+          /* WAVEFORM-FASE1-V1: render after rec-stop */
+          drawWaveform(msg.file);
           if(st)st.textContent='klaar';
           if(dl){dl.style.display='block';}
         } else {
@@ -2032,6 +2039,68 @@ document.addEventListener('DOMContentLoaded', function(){
   setTimeout(trySend, 500);
 });
 
+// === WAVEFORM-FASE1-V1: waveform render ===
+var _waveformAudioCtx = null;
+function _getAudioCtx(){
+  if (!_waveformAudioCtx) {
+    _waveformAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return _waveformAudioCtx;
+}
+function clearWaveform(){
+  var area = document.getElementById('ttb-wave-area');
+  if (area) area.classList.remove('has-sample');
+  var canvas = document.getElementById('ttb-wave-canvas');
+  if (canvas) {
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+function drawWaveform(filename){
+  if (!filename) { clearWaveform(); return; }
+  var url = 'http://localhost:8080/samples/' + encodeURIComponent(filename); /* WAVEFORM-SAMPLES-ROUTE-V1 */
+  fetch(url)
+    .then(function(r){ if (!r.ok) throw new Error('fetch ' + r.status); return r.arrayBuffer(); })
+    .then(function(buf){ return _getAudioCtx().decodeAudioData(buf); })
+    .then(function(audio){ _renderPeaks(audio); })
+    .catch(function(err){ console.warn('waveform load failed:', err); clearWaveform(); });
+}
+function _renderPeaks(audioBuffer){
+  var canvas = document.getElementById('ttb-wave-canvas');
+  var area = document.getElementById('ttb-wave-area');
+  if (!canvas || !area) return;
+  // Resize canvas to actual display size for crisp rendering
+  var rect = area.getBoundingClientRect();
+  canvas.width = Math.max(100, Math.floor(rect.width));
+  canvas.height = Math.max(60, Math.floor(rect.height));
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  // Sum channels to mono
+  var ch0 = audioBuffer.getChannelData(0);
+  var ch1 = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : null;
+  var samplesPerPixel = Math.max(1, Math.floor(audioBuffer.length / W));
+  ctx.strokeStyle = 'rgba(176,106,245,0.85)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (var x = 0; x < W; x++) {
+    var start = x * samplesPerPixel;
+    var end = Math.min(start + samplesPerPixel, audioBuffer.length);
+    var min = 1.0, max = -1.0;
+    for (var i = start; i < end; i++) {
+      var v = ch1 ? (ch0[i] + ch1[i]) * 0.5 : ch0[i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    var yMin = ((1 - min) * 0.5) * H;
+    var yMax = ((1 - max) * 0.5) * H;
+    ctx.moveTo(x + 0.5, yMin);
+    ctx.lineTo(x + 0.5, yMax);
+  }
+  ctx.stroke();
+  area.classList.add('has-sample');
+}
+
 // Fader-listener (master volume)
 document.addEventListener('DOMContentLoaded', function(){
   var fad = document.getElementById('ttb-fader');
@@ -2287,6 +2356,8 @@ function renderActiveSlotForm(){
   };
   // Bestand
   document.getElementById('ttb-edit-file').value = s ? (s.file || '') : '(leeg)';
+  /* WAVEFORM-FASE1-V1: render waveform for selected slot */
+  if (s && s.file) drawWaveform(s.file); else clearWaveform();
   // Source dropdown
   document.getElementById('ttb-edit-source').value =
     (s && s.source) ? s.source : 'ch1';
@@ -2614,6 +2685,8 @@ function recordQueueTap(slotNum){
     <div class="ttb-edit-col">
       <div class="ttb-edit-col-title">SAMPLE</div>
       <div class="ttb-wave-area" id="ttb-wave-area">
+        <!-- WAVEFORM-FASE1-V1 -->
+        <canvas class="ttb-wave-canvas" id="ttb-wave-canvas" width="600" height="120"></canvas>
         <div class="ttb-wave-empty" id="ttb-wave-empty">— geen sample geselecteerd —</div>
       </div>
       <div class="ttb-transport">

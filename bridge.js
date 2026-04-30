@@ -154,6 +154,24 @@ ${files.length === 0 ? "<p>Geen opnames</p>" : ""}
     return;
   }
 
+  // === WAVEFORM-SAMPLES-ROUTE-V1: serve sample-files for waveform display ===
+  if (url.startsWith("/samples/")) {
+    const filename = decodeURIComponent(url.slice(9));
+    const samplesDir = cfg.ttb?.samples_dir || "samples";
+    const fullSamplesDir = path.isAbsolute(samplesDir) ? samplesDir : path.join(process.cwd(), samplesDir);
+    const filepath = path.join(fullSamplesDir, path.basename(filename));
+    if (fs.existsSync(filepath)) {
+      res.writeHead(200, {
+        "Content-Type": "audio/wav",
+        "Access-Control-Allow-Origin": "*",
+        "Content-Length": fs.statSync(filepath).size
+      });
+      fs.createReadStream(filepath).pipe(res);
+    } else {
+      res.writeHead(404); res.end("Sample niet gevonden");
+    }
+    return;
+  }
   if (url.startsWith("/recordings/")) {
     const filename = decodeURIComponent(url.slice(13));
     const filepath = path.join(REC_DIR, path.basename(filename));
