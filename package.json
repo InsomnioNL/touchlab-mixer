@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "easymidi": "^3.2.0",
+    "node-osc": "^11.4.0",
     "ws": "^8.20.0"
   }
 }

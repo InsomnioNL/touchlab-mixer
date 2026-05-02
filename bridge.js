@@ -9,6 +9,7 @@ const path    = require("path");
 const http    = require("http");
 const { spawn, execSync } = require("child_process");
 const { WebSocketServer } = require("ws");
+const trigger = require("./trigger"); // TRIGGER-FEATURE-V1
 
 // ─── Config laden ──────────────────────────────────────────────────────────
 const configPath = process.argv[2] || "session.json";
@@ -702,6 +703,7 @@ httpServer.listen(WS_PORT, () => {
 });
 
 connectToPD();
+trigger.start(); // TRIGGER-START-V1
 if (SAMPLER_ENABLED) {
   samplerIn.bind(SAMPLER_STAT, () => console.log(`✓  Sampler status luisteren op UDP ${SAMPLER_STAT}`));
 }
