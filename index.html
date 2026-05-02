@@ -1110,6 +1110,18 @@ function connect(url){
 }
 function reconnect(){connect(document.getElementById('ws-url').value)}
 function send(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj))}
+// TRIGGER-KEYBOARD-V1: keyboard-listener voor pedaal-emulatie en BLE-HID-pedalen
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (['MetaLeft','MetaRight','ControlLeft','ControlRight','AltLeft','AltRight','ShiftLeft','ShiftRight'].includes(e.code)) return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  send({type: 'keyboard-event', key: e.code, value: 1, timestamp: Date.now()});
+});
+window.addEventListener('keyup', e => {
+  if (['MetaLeft','MetaRight','ControlLeft','ControlRight','AltLeft','AltRight','ShiftLeft','ShiftRight'].includes(e.code)) return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  send({type: 'keyboard-event', key: e.code, value: 0, timestamp: Date.now()});
+});
 function setStatus(live){
   var s=document.getElementById('status-edit');
   s.className='status-txt'+(live?' live':'');

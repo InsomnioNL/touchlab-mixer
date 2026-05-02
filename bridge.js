@@ -604,6 +604,11 @@ function handleFrontendMessage(msg, ws) {
       }));
       break;
     }
+    // Trigger feature (fase 1) — keyboard-events vanuit UI
+    case "keyboard-event": { // TRIGGER-KEYBOARD-V1
+      console.log(`[trigger] KBD key=${msg.key} value=${msg.value}`);
+      break;
+    }
     default: console.warn("Onbekend bericht type:", type);
   }
 }
