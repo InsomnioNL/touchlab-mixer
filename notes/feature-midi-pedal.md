@@ -1,9 +1,16 @@
 # Feature scope — MIDI/OSC-trigger voor TTB queue
 
-**Datum:** 2 mei 2026 (revisie 3)
+**Datum:** 2 mei 2026 (revisie 4)
 **Status:** scope-document, ontwerp afgerond, implementatie nog niet gestart
-**Vorige versies:** 1 mei 2026, 2 mei 2026 revisie 2
+**Vorige versies:** 1 mei 2026, 2 mei 2026 revisies 2 en 3
 **Doel:** documenteren van het ontwerp voor protocol-agnostische trigger-input (MIDI of OSC) waarmee een muzikant of dirigent TTB-cues uit de queue kan triggeren zonder de tablet te hoeven aanraken.
+
+## Wat veranderd is sinds revisie 3
+
+- **Bluetooth MIDI-pedalen impliciet ondersteund in v1** via OS-MIDI-stack (CoreMIDI op macOS, ALSA-MIDI op Linux). easymidi ziet ze als gewone MIDI-input zodra OS-niveau-pairing gedaan is. Geen extra implementatie nodig.
+- **HID-pedalen (Firefly etc.) naar v2** via OS-keymap-tool-routing — bridge blijft strict MIDI+OSC, geen HID-listener.
+- **Bron-keuze MIDI-library**: easymidi (zie ADR-002).
+- **Bron-keuze OSC-library**: node-osc (zie ADR-003).
 
 ## Wat veranderd is sinds 1 mei versie
 
@@ -94,6 +101,7 @@ Mapping wordt niet ongeldig bij poort-wijziging — alleen het luister-eindpunt 
 - **Conflict-detectie tussen mappings** — bridge waarschuwt niet als gebruiker hetzelfde signaal aan twee acties mapt, of `start` zonder `stop`-tegenhanger configureert. v2.
 - **Duur-onderscheid op andere actie-paren** dan pulse↔gate (bijv. start↔stop op één signaal). v1 heeft alleen `pulse-or-gate` als duur-gebaseerde actie. v2 indien nodig.
 - **Per-mapping duur-threshold** — één globale waarde voor alle `pulse-or-gate`-mappings.
+- **Direct HID-pedaal-ondersteuning** (Firefly, andere BLE-HID-page-turners). v2 via OS-keymap-tool — zie aparte sectie verderop.
 - **MIDI- of OSC-output** (TouchLab → externe controller).
 
 ## Architectuurbeslissingen
@@ -229,8 +237,23 @@ Bij MIDI-IAC-bus en OSC-UDP is hot-plug niet emuleerbaar (poorten zijn altijd pr
 | Piano sustain (FC3, DP-10) | MIDI | CC continuous 0-127 | normal | Pedaal-arrival |
 | Keyboard met sustain | MIDI | CC + andere events (filter via mapping) | normal | Hardware-arrival |
 | Drumpad | MIDI | Note On/Off met velocity | normal | Hardware-arrival |
+| BLE MIDI-pedaal (iRig BlueBoard, AirTurn-MIDI-modus) | MIDI via BLE → CoreMIDI/ALSA | CC of Note On/Off, model-afhankelijk | model-afhankelijk | BLE-pedaal-arrival |
 | Glover + Leap | OSC of MIDI | gesture float of CC | normal | **Beschikbaar nu** |
 | Mock-Pd-patch | MIDI (IAC) en OSC (UDP) | configureerbaar | beide | **Beschikbaar nu** |
+
+### Bluetooth MIDI in v1
+
+Bluetooth-MIDI-pedalen werken zonder bridge-aanpassingen, mits ze BLE MIDI ondersteunen (i.t.t. BLE HID — zie volgende sub-sectie). Werkwijze voor gebruiker:
+
+1. **macOS**: Audio MIDI Setup → MIDI Studio → Bluetooth Configuration → pedaal koppelen
+2. **Linux**: `bluez` + `aseqdump` voor BLE MIDI; soms vereist `bluez-alsa` of vergelijkbare bridge
+3. Daarna verschijnt het pedaal als gewone MIDI-input, easymidi pikt het op via `getInputs()`
+
+Geen aanpassingen aan bridge of UI. Standaard learn-flow, standaard mapping. **Latency-caveat:** BLE MIDI is ~10-30ms versus ~1-3ms voor wired USB MIDI; in fase 5 hardware-validatie meten of dat acceptabel is voor onze use-cases.
+
+### HID-pedalen (Firefly etc.) — niet in v1
+
+PageFlip Firefly en vergelijkbare BLE-HID-pedalen sturen page-up/page-down keystrokes, geen MIDI. Bridge ondersteunt deze niet direct in v1 of v2. Zie sectie "v2-uitbreiding: HID-pedalen via OS-keymap-tool" hieronder.
 
 ## Mock-Pd-bron
 
@@ -288,9 +311,33 @@ Kan parallel aan fase 1 of erna. Niet kritisch maar handig voor validatie van fa
 **Fase 5 (post-pedaal) — hardware-validatie**
 
 - Hot-plug-test met echt pedaal
-- Latency-meting fysieke voet → audio-out
+- Latency-meting fysieke voet → audio-out, separat voor wired USB en BLE MIDI
 - Hardware-specifieke quirks documenteren als gevonden
 - Inversed-polarity-pedalen testen (DIY-converters)
+
+## v2-uitbreiding: HID-pedalen via OS-keymap-tool
+
+Veel musici gebruiken bladmuziek-pedalen zoals PageFlip Firefly. Die zijn BLE-HID, niet BLE-MIDI — sturen keystrokes (page-up / page-down). Bridge implementeert geen eigen HID-listener om de architectuur strict MIDI+OSC te houden. In plaats daarvan: gebruiker installeert een OS-keymap-tool die de keystrokes detecteert en een OSC-bericht naar bridge stuurt.
+
+### Aanpak per OS
+
+- **macOS**: Karabiner-Elements heeft "Complex Modifications" die een keystroke kunnen mappen naar een shell-script. Script stuurt OSC via `oscsend` (van `liblo`) of een mini-Node-script naar bridge.
+- **Linux**: `xdotool` of `evdev`-listener met scripts. Vergelijkbare aanpak.
+- **Windows**: AutoHotkey-script dat keystrokes opvangt en OSC stuurt.
+
+### Beperking voor v2: alleen play/stop
+
+Firefly heeft twee fysieke knoppen (forward/back). v2-mapping: forward → `start`, back → `stop`. Geen pulse, geen gate, geen pulse-or-gate — die vereisen een press-and-hold-detection die HID-pedalen op systeem-niveau niet betrouwbaar leveren (sommige sturen alleen "key-released-after-N-ms" als de native repeat-delay).
+
+### Wat in v2 gebouwd wordt
+
+Geen bridge-code-uitbreiding. Wel:
+
+1. **Documentatie** in repo: setup-handleiding per OS voor Firefly + Karabiner/AutoHotkey/xdotool. Met voorbeeld-config-files.
+2. **OSC-conventie**: aanbevolen path `/touchlab/pedal/forward` en `/touchlab/pedal/back` zodat handleidingen consistent zijn. Gebruiker mapt in TouchLab-UI deze paths aan `start` en `stop`.
+3. **UI-tag**: bron-info-display herkent deze paths en toont "Firefly via OS-keymap" als hint, voor herkenbaarheid.
+
+Schatting: ~2u werk in totaal (documentatie + UI-tag), geen architectuur-werk.
 
 ## Wat dit níet doet
 
@@ -312,6 +359,7 @@ Kan parallel aan fase 1 of erna. Niet kritisch maar handig voor validatie van fa
 - **Glover-als-bron-kwetsbaarheid.** Glover stuurt continu data, niet discrete events. Voor queue-trigger-doel moet bridge een gesture-confidence-curve interpreteren als binary signaal — werkt prima voor "vuist gebald = active", gebruiker moet wel een gesture kiezen die binary genoeg is. Niet bridge's probleem; gebruiker-config in Glover.
 - **OSC-poort-wijziging zonder restart.** Bridge moet UDP-listener netjes sluiten en heropenen. Bij falen blijft mogelijk oude listener actief, of crasht bridge. Te robust testen in fase 2.
 - **`pulse-or-gate` duur-threshold-tuning.** Default 250ms is overgenomen van UI-trigger-logica, maar voet-mechaniek is trager dan vinger-touch. Mogelijk verstandig om voor pedaal-bronnen een hogere default te overwegen — kan empirisch afgesteld worden in fase 4 met mock-Pd. Voor v1 één globale waarde, gebruiker stelt zelf bij in UI als nodig.
+- **BLE MIDI latency en jitter.** Bluetooth heeft inherent meer latency en variatie dan wired USB. Voor uitgesponnen samples acceptabel; voor strikte timing-bediening (sample op een 16e laten landen) merkbaar. Te valideren in fase 5. Mogelijk advies in documentatie: voor strikte timing wired pedaal gebruiken.
 
 ## Open vragen voor implementatie-sessie
 
@@ -333,6 +381,8 @@ Kan parallel aan fase 1 of erna. Niet kritisch maar handig voor validatie van fa
 
 ## Verwijzingen
 
-- ADR-001: Protocol-agnostische event-router voor trigger-input — in `notes/adr/` (te schrijven).
+- ADR-001: Protocol-agnostische event-router voor trigger-input — in `notes/adr/`.
+- ADR-002: MIDI-library-keuze easymidi — in `notes/adr/`.
+- ADR-003: OSC-library-keuze node-osc — in `notes/adr/`.
 - Architectuurvraag E in `overdrachtsdocument-werksessie-2026-05-01-avond.md`, sectie 3 — bevestigde gate-mode-werking in queue-context.
 - `QUEUE-ADVANCE-ON-RELEASE-V1`-marker in UI-code — pre-existing alignment voor trigger-flow.
