@@ -1,9 +1,9 @@
 # Overdrachtsdocument werksessie 2 mei 2026
 
-**Datum:** zaterdag 2 mei 2026
+**Datum:** zaterdag 2 mei 2026 (versie 2 — uitgebreid na avond-sessie)
 **Voorgaande sessie:** `overdrachtsdocument-werksessie-2026-05-01-avond.md`
-**Hoofdthema:** trigger-feature ontwerp + fase-1-implementatie (MIDI/OSC/keyboard input-detectie)
-**Status aan einde van sessie:** fase 1 compleet en gevalideerd met live data van drie bronnen
+**Hoofdthema:** trigger-feature ontwerp + fase-1-implementatie (MIDI/OSC/keyboard input-detectie) + fase-2-skeleton (mapping-store, match, persistence, hysterese-state-machine)
+**Status aan einde van sessie:** fase 1 compleet, fase 2-skeleton met persistence en hysterese werkend, binary-pad-hysterese gevalideerd; continuous-pad-hysterese en action-dispatch nog niet
 
 ## 1. Lees-volgorde voor context
 
@@ -88,7 +88,41 @@ In `notes/working-docs/`:
 - **20 ws-files uit git-tracking gehaald** — die waren historisch gecommit door ontbrekende ignore. -5575 regels.
 - **Dual package.json setup ontdekt:** `~/Documents/Pd/PDMixer/package.json` (oud, voor v2-runtime) én nu ook `~/Documents/touchlab-mixer/package.json` (repo). Beide hebben nu `easymidi` + `node-osc` + `ws`.
 
-## 4. Negen commits gepusht in deze sessie
+### 3.6 Fase-2-skeleton geïmplementeerd
+
+Na fase 1 is in dezelfde sessie een fase-2-skeleton gebouwd met vier bouwlagen:
+
+#### Mapping-store (commit 52f5dfd)
+- Nieuwe file `triggerStore.js` met in-memory state
+- Functions: `load(cfg)`, `getAll()`, `add(mapping)`, `remove(id)`, `matchEvent(evt)`
+- `load()` valt netjes terug op lege array als `cfg.triggers` ontbreekt
+- Ids worden auto-toegekend met counter, na load gesynchroniseerd op hoogste bestaande id
+- Matching gebeurt via `signaturesMatch()` — alle keys in mapping.signature moeten exact matchen met event.signature (subset-match)
+
+#### Centrale event-handler (commit da3f1a8)
+- `trigger.js` refactor: alle protocollen normaliseren naar interne event-vorm en roepen `onEvent(evt)` aan
+- Drie normalize-helpers: `normalizeMidiCc`, `normalizeMidiNote`, `normalizeOsc`
+- Keyboard normalize loopt via nieuwe export `handleKeyboardEvent(uiPayload)` die bridge.js aanroept vanuit ws-handler
+- `onEvent` matcht events tegen alle mappings, logt event en eventuele matches
+- `bridge.js` `keyboard-event`-case roept nu `trigger.handleKeyboardEvent(msg)` aan
+- Drie nieuwe test-WS-handlers: `mapping-add-test`, `mapping-list-test`, `mapping-remove-test` — bedoeld voor handmatige tests via DevTools-console, vervangen door real UI in latere fase
+
+#### Persistence (commit ceea360)
+- `mapping-add-test`/`mapping-remove-test`-handlers schrijven `cfg.triggers = triggerStore.getAll()` en triggeren `saveSessionToDisk(cfg, null, {skipReload: true})`
+- `skipReload` voorkomt onnodige TTB-sample-reload bij elke mapping-wijziging
+- Mappings overleven bridge-restart — bevestigd via test: mapping toegevoegd → bridge stop → bridge start → match werkt zonder re-add
+
+#### Hysterese-state-machine (commit e0ab1d7)
+- `triggerStore` krijgt `applyThresholdDefaults()` bij add — defaults afhankelijk van protocol (MIDI: 64/32, OSC: 0.5/0.3, keyboard: geen)
+- Runtime state-Map `stateById` in triggerStore — niet gepersisteerd, reset bij bridge-restart (bewust)
+- `onEvent` evalueert per match `evaluateHysteresis(mapping, value)` met return `"activate" | "release" | "no-change"`
+- Voor binary-mappings (geen thresholds): value > 0 → activate, value === 0 → release
+- Voor continuous (met thresholds): standaard hysterese-state-machine met dode zone tussen thresholds
+- Logging onderscheidt nu `TRANSITION=ACTIVATE`, `TRANSITION=RELEASE`, en `(no state change)`
+- **Binary-pad gevalideerd** met keyboard-mapping (KeyZ aan/uit-cyclus produceert correct ACTIVATE/RELEASE)
+- **Continuous-pad NIET gevalideerd** — vereist Leap-bron of mock-Pd-patch die we deze sessie niet meer gedaan hebben
+
+## 4. Veertien commits gepusht in deze sessie
 
 ```
 ce69f1f  Update MIDI-pedal scope (rev 3) + ADR-001 protocol-agnostic event-router
@@ -100,7 +134,14 @@ abd7141  Add mock-Pd-blueprint working doc - pre-implementation
 3fea5db  Add trigger.js: minimal MIDI listener (fase 1, MIDI-only)
 c2efe7f  trigger.js: add OSC listener on UDP 9100 (validated with Glover)
 757ba43  Fase 1 compleet: keyboard-listener UI->bridge (validated with Mac keyboard)
+dc671ef  Add overdrachtsdocument werksessie 2026-05-02 - fase 1 trigger-feature compleet
+52f5dfd  Add triggerStore.js: in-memory mapping-store skeleton (loaded from cfg.triggers)
+da3f1a8  trigger.js refactor: central onEvent + mapping-match (validated with Glover OSC)
+ceea360  Mappings persistent via cfg.triggers + saveSessionToDisk (skipReload)
+e0ab1d7  Hysteresis state-machine in trigger.js + threshold defaults in triggerStore (binary path validated)
 ```
+
+(Het overdrachtsdocument-commit `dc671ef` was geschreven na fase 1, vóórdat het fase-2-skeleton-werk was uitgevoerd. Dit document is daarna bijgewerkt met de extra context — versie 2 — maar als losse "v2"-update niet apart gecommit, wordt onderdeel van de volgende commit.)
 
 ## 5. Belangrijke ontdekkingen tijdens deze sessie
 
@@ -133,6 +174,22 @@ Bij elke OSC-bericht heeft Glover een nieuwe UDP source-poort. Niet relevant voo
 ### Ontdekking K: BLE-HID-pedalen werken via browser-keyboard-events
 
 Eerder dachten we dat HID-pedalen (Firefly) externe OS-keymap-tools nodig hadden om naar bridge te routen. Realisatie: TouchLab-UI is een browser-app, browser ontvangt keystrokes al van BLE-keyboards. UI-listener vangt 'm op, stuurt naar bridge. Veel eenvoudiger architectuur, hele OS-keymap-tool-laag verdwijnt.
+
+### Ontdekking L: argumentloze OSC-events triggeren state-machine fout
+
+Glover stuurt sommige OSC-paths argumentloos (`/hit`, `/yaw`, `/block1`, `/unblock1`). Onze `normalizeOsc()` zet `value: 0` als geen arg aanwezig. Dat botst met de hysterese-state-machine: een argumentloze pulse zou een instantane trigger moeten zijn, maar wordt nu altijd geïnterpreteerd als `value=0` → blijft INACTIVE → geen ACTIVATE. **Latente bug**, te fixen in volgende sessie. Mogelijke aanpak: speciale "pulse-mode" voor argumentloze paths, of `value: undefined` als geen arg en die afzonderlijk afhandelen.
+
+### Ontdekking M: Glover heeft geen toggle-button voor handmatige tests
+
+Tijdens hysterese-validatie wilden we OSC `/up` triggeren met val=0 voor RELEASE-pad. Glover heeft alleen "Send Value"-push als handmatige actie, geen toggle. Dat maakt continuous-pad-validatie zonder Leap-hardware lastig. **Voor volgende sessie**: Leap aansluiten, of mock-Pd-patch bouwen die continuous ramps stuurt.
+
+### Ontdekking N: bestaande mappings krijgen geen retro-actieve thresholds
+
+Een mapping toegevoegd vóór de hysterese-patch heeft geen `thresholdActive`/`thresholdInactive`. Bij `load()` blijft die zonder thresholds — wordt door bridge geïnterpreteerd als binary-mode. **Niet kritiek nu** want we hebben de oude mapping handmatig verwijderd, maar als idempotent migration-pad ooit nodig is, voeg dan defaults toe in `load()` ook (niet alleen in `add()`).
+
+### Ontdekking O: state-Map is bewust niet-persistent
+
+`stateById` in triggerStore is in-memory only. Bij bridge-restart begint elke mapping op INACTIVE, ongeacht of de fysieke bron nog actief is. Dit voorkomt "hangende" state na restart, en is in de meeste gevallen wenselijk — fysieke bronnen zoals pedalen zijn typisch niet ingedrukt tijdens een bridge-restart. **Documenteren in fase 3** indien nodig.
 
 ## 6. Chat-rendering-bug — strategieën update
 
@@ -182,37 +239,61 @@ notes/
     ├── preflight-fase-1.md           (uitgevoerd — kan weg of bewaard)
     └── mock-pd-blueprint.md          (niet meer kritisch — Glover dekt validatie)
 
-bridge.js                  (met TRIGGER-FEATURE-V1, TRIGGER-START-V1, TRIGGER-KEYBOARD-V1 markers)
-trigger.js                 (TRIGGER-FEATURE-V1, TRIGGER-OSC-V1)
-index.html                 (TRIGGER-KEYBOARD-V1)
+bridge.js                  (markers: TRIGGER-FEATURE-V1, TRIGGER-STORE-V1, TRIGGER-START-V1,
+                            TRIGGER-KEYBOARD-V2, TRIGGER-MAPPING-TEST-V1, TRIGGER-PERSIST-V1)
+trigger.js                 (markers: TRIGGER-FEATURE-V1, TRIGGER-OSC-V1, TRIGGER-NORMALIZE-V1, TRIGGER-HYSTERESE-V1)
+triggerStore.js            (markers: TRIGGER-STORE-V1, TRIGGER-HYSTERESE-V1)
+index.html                 (markers: TRIGGER-KEYBOARD-V1)
 package.json               (met easymidi, node-osc, ws)
 package-lock.json
 .gitignore                 (met node_modules/)
 ```
 
 V2-werkomgeving `~/Documents/Pd/PDMixer/v2/`:
-- `bridge.js`, `trigger.js`, `index.html` identiek aan repo
+- `bridge.js`, `trigger.js`, `triggerStore.js`, `index.html` identiek aan repo
 - `bridge.js.backup-2026-05-02-fase1` — backup vóór fase-1-patches
+- `trigger.js.backup-2026-05-02-fase2A` — backup vóór hysterese-refactor
+- `session.json` heeft één live mapping (id=2: OSC `/up` → pulse, met thresholds 0.5/0.3)
 
 ## 8. Open vragen voor volgende sessie
 
-### 8.1 Fase 2 voorbereidingsvragen
+### 8.1 Action-dispatch (de volgende grote stap)
 
-- **`session.json`-schema voor mappings.** Waar voegen we de mappings-array toe? Top-level of in een sub-object? Hoe migreren bestaande sessies (zonder mappings) naar nieuw schema — graceful default of explicit init?
-- **Learn-flow-state-machine in bridge.** Wanneer is bridge in "learn-mode"? Per WS-client (één client kan leren terwijl andere clients normaal trigger), of globaal (alle clients zien learn-mode tegelijk)?
-- **UI-locatie voor mappings-lijst.** Nieuw modal? Eigen pagina? Sectie in bestaande settings? Hangt af van hoe huidige UI is georganiseerd — moet je beslissen.
-- **Hysterese-defaults voor onbekende OSC-paths.** Glover stuurt zowel `[1]`-pulses als continuous floats. Bij learn moet bridge de range observeren en defaults afleiden. Algoritme nog niet uitontworpen.
+Mapping-match werkt en hysterese werkt. Volgende fase: **bij TRANSITION=ACTIVATE/RELEASE een actie uitvoeren** (zoals `samplerPlay`/`samplerStop`/`queueAdvance`). Beslissing van vorige sessie was **pad X / optie 1b**: bridge stuurt `triggerActivate`/`triggerRelease` naar UI zonder slot, UI bepaalt zelf `ttbQueue[ttbQueuePos]` en routeert naar bestaande `buildTriggerButton`-logica.
 
-### 8.2 Andere open punten
+Concrete taken:
+- WS-message-types `triggerActivate` en `triggerRelease` definiëren
+- Bridge-side: bij hysterese-transitie WS-message broadcasten
+- UI-side: handler die action-dispatch doet via interne `handleTriggerAction(slot, phase)`-functie (refactor van bestaande pointerdown/pointerup-logica)
+- Validatie: keyboard-mapping op `pulse`-actie → echte sample speelt af in TouchLab
+
+### 8.2 Argumentloze OSC fix (latente bug, ontdekking L)
+
+Glover's `/hit`, `/yaw`, `/block1`, `/unblock1` worden nu altijd `value=0` → blijven INACTIVE. Fix-aanpak voorstellen tijdens implementatie. Mogelijke oplossingen:
+- Speciale "puls-mode" voor argumentloze paths (één event = één activate+release)
+- `value: undefined` als geen arg en die afzonderlijk afhandelen in evaluateHysteresis
+- Een nieuw mapping-type `pulse-instant` dat geen state-machine gebruikt
+
+### 8.3 Continuous-pad-validatie (uitgesteld vanwege ontdekking M)
+
+Hysterese-state-machine voor continuous bronnen is ontworpen en geïmplementeerd, maar niet gevalideerd met live continuous data. Twee opties voor validatie:
+- Leap aansluiten + Glover-OSC-streaming-mode → echte continuous floats
+- Mock-Pd-patch bouwen (zie `notes/working-docs/mock-pd-blueprint.md`)
+
+### 8.4 UI voor mapping-beheer
+
+Nu mappings via DevTools-console worden toegevoegd, niet via UI. Voor productie-gebruik nodig:
+- Mapping-lijst in UI (zien wat er gemapt staat)
+- Add-knop met learn-flow (druk-houd-release detection)
+- Verwijder-knop per mapping
+- Eventueel: live-debug-panel voor binnenkomende events tijdens learn
+
+### 8.5 Andere open punten
 
 - **MIDI channel-indexing.** easymidi gebruikt 0-based, MIDI-spec is 1-based. Voor `session.json` kies één conventie en converteer in normalize-laag. Voorstel: 1-based opslaan (mensvriendelijker, MIDI-spec-conform).
 - **`pulse-or-gate` duur-threshold global vs per-mapping.** Scope-doc zegt globaal. Bij echt-pedaal-validatie kan blijken dat per-mapping nuttig is. Niet kritisch nu.
-- **Mock-Pd-patch wel of niet bouwen.** Met Glover als echte MIDI+OSC-bron is de mock minder kritisch. Mogelijk overslaan, of alleen bouwen als regressie-test-tool.
-
-### 8.3 Vragen die in deze sessie ontstonden maar nog niet beantwoord
-
-- **OSC-path-conventie voor mappings.** Glover heeft eigen path-keuzes (`/posLR`, `/hit`, etc.). Bij learn slaat bridge het pad op zoals Glover het stuurt. Voor manuele config zou een conventie-document nuttig zijn — bijv. "TouchLab raadt `/touchlab/trigger/...`-paths aan voor custom OSC-bronnen". Niet kritisch.
-- **Argumentloze OSC-events**: Glover stuurt `/hit args=[]`. Onze normalize defaults `value: 0` als geen arg. Dat betekent dat een argumentloze pulse altijd `value=0` produceert, wat in hysterese-state-machine als "inactive" wordt gezien. **Bug-potential** — argumentloze paths moeten als instantane events worden behandeld (één keer trigger, geen state). Te oplossen in fase 3.
+- **Backward compat in `triggerStore.load()`.** Mappings zonder thresholds krijgen ze nu niet retro-actief. Tijdens deze sessie was dat geen probleem (handmatig opgeruimd), maar als ooit een complete migration nodig is, defaults ook in `load()` toepassen.
+- **`event.preventDefault()` op gemapte keys in UI.** Nu sturen we keystrokes naar bridge, maar browser-default acties blijven werken (toets type-events naar focused input, etc.). Bij gemapte keys zou preventDefault gewenst zijn — maar UI weet pas via bridge welke keys gemapt zijn. Mogelijk oplossing: bridge stuurt mapping-list naar UI bij init, UI past preventDefault toe.
 
 ## 9. Werkstrategieën die effectief waren
 
@@ -226,12 +307,13 @@ V2-werkomgeving `~/Documents/Pd/PDMixer/v2/`:
 In volgorde van prioriteit:
 
 1. **Lees deze overdracht en `notes/feature-midi-pedal.md` revisie 5.**
-2. **Beslis fase-2-aanpak**: mapping-storage eerst (bridge + `session.json`-schema), of UI-design eerst (mappings-lijst layout)?
-3. **Pre-flight kort**: bevestig baseline draait (canonical startup), bridge logt nog steeds drie protocollen bij startup, geen regressies.
-4. **Fase 2 begin**: mapping-add WS-message + bridge-side opslag + minimale UI om te valideren. Geen full learn-flow yet — eerst mappings handmatig kunnen toevoegen via een test-message.
-5. **Fase 2 vervolg**: full learn-flow met UI-knoppen.
+2. **Pre-flight kort**: bevestig baseline draait (canonical startup), bridge logt nog steeds drie protocollen + `[trigger-store] loaded N mapping(s)` bij startup. Test eventueel of bestaande mapping (id=2: OSC `/up` → pulse) nog matcht.
+3. **Eerste reparatie**: argumentloze OSC-bug fixen (ontdekking L) — kleine fix, opent het pad voor `/hit`-style triggers.
+4. **Action-dispatch (fase 3 begin)**: kies kleinste deelstap. Voorstel: alleen `pulse`-actie laten werken via WS-message naar UI, UI proxiet naar bestaande logica. Continuous bronnen kunnen wachten tot continuous-validatie (Leap of mock-Pd) beschikbaar is.
+5. **Continuous-pad-validatie**: ofwel Leap aansluiten ofwel mock-Pd-patch bouwen.
+6. **Pas dan UI voor mapping-beheer** — laagste prioriteit gegeven dat we nu via DevTools-console verder kunnen.
 
-Inschatting fase 2: 2-4 uur, afhankelijk van UI-werk. Niet op één dag te doen.
+Inschatting fase 3 + UI: 4-6 uur, gespreid over meerdere sessies.
 
 ## 11. Cross-referenties
 
@@ -242,5 +324,11 @@ Inschatting fase 2: 2-4 uur, afhankelijk van UI-werk. Niet op één dag te doen.
 - **Markers in code voor trigger-feature**:
   - `TRIGGER-FEATURE-V1` (bridge.js regel 12, trigger.js regel 1)
   - `TRIGGER-START-V1` (bridge.js regel 706)
+  - `TRIGGER-STORE-V1` (bridge.js regels 13 en 49, triggerStore.js)
   - `TRIGGER-OSC-V1` (trigger.js regels 5, 34)
-  - `TRIGGER-KEYBOARD-V1` (bridge.js regel 608, index.html regel 1113)
+  - `TRIGGER-NORMALIZE-V1` (trigger.js — central onEvent)
+  - `TRIGGER-KEYBOARD-V1` (index.html regel 1113)
+  - `TRIGGER-KEYBOARD-V2` (bridge.js regel 610 — geüpgraded van V1)
+  - `TRIGGER-MAPPING-TEST-V1` (bridge.js regel 614)
+  - `TRIGGER-PERSIST-V1` (bridge.js regels 615, 626)
+  - `TRIGGER-HYSTERESE-V1` (trigger.js + triggerStore.js)
