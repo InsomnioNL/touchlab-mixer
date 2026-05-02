@@ -606,9 +606,24 @@ function handleFrontendMessage(msg, ws) {
       }));
       break;
     }
-    // Trigger feature (fase 1) — keyboard-events vanuit UI
-    case "keyboard-event": { // TRIGGER-KEYBOARD-V1
-      console.log(`[trigger] KBD key=${msg.key} value=${msg.value}`);
+    // Trigger feature (fase 2) — keyboard-events vanuit UI naar trigger-module
+    case "keyboard-event": { // TRIGGER-KEYBOARD-V2
+      trigger.handleKeyboardEvent(msg);
+      break;
+    }
+    // TRIGGER-MAPPING-TEST-V1: handmatig mappings toevoegen voor test
+    case "mapping-add-test": {
+      const stored = triggerStore.add(msg.mapping || {});
+      if (ws) ws.send(JSON.stringify({ type: "mapping-added", mapping: stored }));
+      break;
+    }
+    case "mapping-list-test": {
+      if (ws) ws.send(JSON.stringify({ type: "mapping-list", mappings: triggerStore.getAll() }));
+      break;
+    }
+    case "mapping-remove-test": {
+      const ok = triggerStore.remove(msg.id);
+      if (ws) ws.send(JSON.stringify({ type: "mapping-removed", id: msg.id, success: ok }));
       break;
     }
     default: console.warn("Onbekend bericht type:", type);
