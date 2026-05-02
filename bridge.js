@@ -612,8 +612,10 @@ function handleFrontendMessage(msg, ws) {
       break;
     }
     // TRIGGER-MAPPING-TEST-V1: handmatig mappings toevoegen voor test
-    case "mapping-add-test": {
+    case "mapping-add-test": { // TRIGGER-PERSIST-V1
       const stored = triggerStore.add(msg.mapping || {});
+      cfg.triggers = triggerStore.getAll();
+      saveSessionToDisk(cfg, null, { skipReload: true });
       if (ws) ws.send(JSON.stringify({ type: "mapping-added", mapping: stored }));
       break;
     }
@@ -621,8 +623,12 @@ function handleFrontendMessage(msg, ws) {
       if (ws) ws.send(JSON.stringify({ type: "mapping-list", mappings: triggerStore.getAll() }));
       break;
     }
-    case "mapping-remove-test": {
+    case "mapping-remove-test": { // TRIGGER-PERSIST-V1
       const ok = triggerStore.remove(msg.id);
+      if (ok) {
+        cfg.triggers = triggerStore.getAll();
+        saveSessionToDisk(cfg, null, { skipReload: true });
+      }
       if (ws) ws.send(JSON.stringify({ type: "mapping-removed", id: msg.id, success: ok }));
       break;
     }
