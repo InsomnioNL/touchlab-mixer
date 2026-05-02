@@ -16,12 +16,42 @@ let oscServer = null;
 function onEvent(evt) {
   const matches = triggerStore.matchEvent(evt);
   const sigStr = JSON.stringify(evt.signature);
-  if (matches.length > 0) {
-    const ids = matches.map(m => `id=${m.id} action=${m.action}`).join(", ");
-    console.log(`[trigger] EVENT [${evt.protocol}] src=${evt.source} sig=${sigStr} val=${evt.value} → MATCH(${matches.length}): ${ids}`);
-  } else {
+  if (matches.length === 0) {
     console.log(`[trigger] EVENT [${evt.protocol}] src=${evt.source} sig=${sigStr} val=${evt.value}`);
+    return;
   }
+  // TRIGGER-HYSTERESE-V1: per match hysterese-state evaluatie.
+  // Binary bronnen (keyboard, of mapping zonder thresholds) → directe state-mapping.
+  // Continuous bronnen (MIDI CC, OSC float) → vergelijk tegen mapping.thresholdActive/Inactive.
+  for (const m of matches) {
+    const transition = evaluateHysteresis(m, evt.value);
+    if (transition === "no-change") {
+      console.log(`[trigger] EVENT [${evt.protocol}] src=${evt.source} sig=${sigStr} val=${evt.value} → MATCH id=${m.id} action=${m.action} (no state change)`);
+    } else {
+      triggerStore.setState(m.id, transition === "activate" ? "ACTIVE" : "INACTIVE");
+      console.log(`[trigger] EVENT [${evt.protocol}] src=${evt.source} sig=${sigStr} val=${evt.value} → MATCH id=${m.id} action=${m.action} TRANSITION=${transition.toUpperCase()}`);
+    }
+  }
+}
+
+// TRIGGER-HYSTERESE-V1: bepaal of een event een state-transitie veroorzaakt.
+// Returns: "activate" | "release" | "no-change"
+function evaluateHysteresis(mapping, value) {
+  const currentState = triggerStore.getState(mapping.id);
+  const hasThresholds = (mapping.thresholdActive !== undefined && mapping.thresholdInactive !== undefined);
+
+  if (!hasThresholds) {
+    // Binary mode: value 0 = inactive, value > 0 = active
+    const wantActive = value > 0;
+    if (wantActive && currentState === "INACTIVE") return "activate";
+    if (!wantActive && currentState === "ACTIVE") return "release";
+    return "no-change";
+  }
+
+  // Hysteresis mode
+  if (currentState === "INACTIVE" && value >= mapping.thresholdActive) return "activate";
+  if (currentState === "ACTIVE" && value <= mapping.thresholdInactive) return "release";
+  return "no-change";
 }
 
 // MIDI normalize-helpers

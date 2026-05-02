@@ -23,16 +23,34 @@ function getAll() {
 
 function add(mapping) {
   const id = nextId++;
-  const stored = { id, ...mapping };
+  const withDefaults = applyThresholdDefaults(mapping); // TRIGGER-HYSTERESE-V1
+  const stored = { id, ...withDefaults };
   mappings.push(stored);
   console.log(`[trigger-store] added mapping id=${id} action=${mapping.action} protocol=${mapping.protocol}`);
   return stored;
+}
+
+// TRIGGER-HYSTERESE-V1: sane default thresholds per protocol als ze niet meegegeven zijn.
+// Continuous bronnen krijgen actieve/inactieve thresholds.
+// Binary bronnen (keyboard) krijgen geen — hysterese wordt overgeslagen in trigger.js.
+function applyThresholdDefaults(m) {
+  if (m.thresholdActive !== undefined && m.thresholdInactive !== undefined) return m;
+  const p = m.protocol;
+  if (p === "midi") {
+    return { thresholdActive: 64, thresholdInactive: 32, ...m };
+  }
+  if (p === "osc") {
+    return { thresholdActive: 0.5, thresholdInactive: 0.3, ...m };
+  }
+  // keyboard or unknown: no thresholds
+  return m;
 }
 
 function remove(id) {
   const idx = mappings.findIndex(m => m.id === id);
   if (idx === -1) return false;
   mappings.splice(idx, 1);
+  stateById.delete(id); // TRIGGER-HYSTERESE-V1
   console.log(`[trigger-store] removed mapping id=${id}`);
   return true;
 }
@@ -55,4 +73,20 @@ function signaturesMatch(a, b) {
   return true;
 }
 
-module.exports = { load, getAll, add, remove, matchEvent };
+// TRIGGER-HYSTERESE-V1: runtime state per mapping (niet gepersisteerd).
+// Gebruikt door trigger.js voor hysterese-state-machine.
+const stateById = new Map(); // id -> "ACTIVE" | "INACTIVE"
+
+function getState(id) {
+  return stateById.get(id) || "INACTIVE";
+}
+
+function setState(id, state) {
+  stateById.set(id, state);
+}
+
+function clearStateForRemoved(id) {
+  stateById.delete(id);
+}
+
+module.exports = { load, getAll, add, remove, matchEvent, getState, setState, clearStateForRemoved };
