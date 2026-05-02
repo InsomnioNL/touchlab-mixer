@@ -10,6 +10,7 @@ const http    = require("http");
 const { spawn, execSync } = require("child_process");
 const { WebSocketServer } = require("ws");
 const trigger = require("./trigger"); // TRIGGER-FEATURE-V1
+const triggerStore = require("./triggerStore"); // TRIGGER-STORE-V1
 
 // ─── Config laden ──────────────────────────────────────────────────────────
 const configPath = process.argv[2] || "session.json";
@@ -45,6 +46,7 @@ function sanitizeSessionName(name) {
 }
 
 const cfg = loadSessionAtStartup();
+triggerStore.load(cfg); // TRIGGER-STORE-V1
 
 const sessionName    = cfg.session_name || cfg.session || path.basename(configPath, ".json");
 const PD_FUDI_PORT   = cfg.osc_receive_port || 9000;
