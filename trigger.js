@@ -2,6 +2,7 @@
 // Fase 1 minimaal: alleen detectie + logging naar terminal.
 
 const easymidi = require("easymidi");
+const { Server: OscServer } = require("node-osc"); // TRIGGER-OSC-V1
 
 let inputs = [];
 
@@ -28,6 +29,23 @@ function start() {
     } catch (err) {
       console.log(`[trigger] failed to open "${name}": ${err.message}`);
     }
+  }
+
+  // TRIGGER-OSC-V1: OSC listener op UDP 9100
+  try {
+    const oscPort = 9100;
+    const oscServer = new OscServer(oscPort, "0.0.0.0", () => {
+      console.log(`[trigger] OSC: listening on UDP port ${oscPort}`);
+    });
+    oscServer.on("message", (msg, rinfo) => {
+      const remoteAddr = rinfo ? `${rinfo.address}:${rinfo.port}` : "unknown";
+      console.log(`[trigger] OSC msg src=${remoteAddr} path=${msg[0]} args=${JSON.stringify(msg.slice(1))}`);
+    });
+    oscServer.on("error", (err) => {
+      console.log(`[trigger] OSC error: ${err.message}`);
+    });
+  } catch (err) {
+    console.log(`[trigger] OSC failed to start: ${err.message}`);
   }
 }
 
