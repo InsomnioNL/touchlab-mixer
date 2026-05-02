@@ -10,3 +10,6 @@ recordings/
 # Tijdelijke bestanden
 *.tmp
 *.bak
+
+# Node.js dependencies (lokaal geïnstalleerd, niet committen)
+node_modules/
