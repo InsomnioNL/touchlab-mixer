@@ -1,9 +1,16 @@
 # Feature scope — MIDI/OSC-trigger voor TTB queue
 
-**Datum:** 2 mei 2026 (revisie 4)
+**Datum:** 2 mei 2026 (revisie 5)
 **Status:** scope-document, ontwerp afgerond, implementatie nog niet gestart
-**Vorige versies:** 1 mei 2026, 2 mei 2026 revisies 2 en 3
+**Vorige versies:** 1 mei 2026, 2 mei 2026 revisies 2, 3 en 4
 **Doel:** documenteren van het ontwerp voor protocol-agnostische trigger-input (MIDI of OSC) waarmee een muzikant of dirigent TTB-cues uit de queue kan triggeren zonder de tablet te hoeven aanraken.
+
+## Wat veranderd is sinds revisie 4
+
+- **Keyboard als derde first-class protocol in v1.** UI vangt keystrokes op via `keydown`/`keyup`, stuurt ze via WebSocket door naar bridge. Geen externe OS-keymap-tools meer nodig.
+- **HID-pedalen (Firefly etc.) ondersteund in v1**, niet meer v2, via de keyboard-protocol-route. BLE-HID-pedaal pairt als BLE-keyboard met de iPad/Mac/etc., browser ontvangt keystrokes, UI routeert door.
+- **Multi-functie HID-pedalen**: bij modellen met configureerbare keystrokes per knop (bijv. 4-pedaal Firefly) kunnen sommige knoppen aan bladmuziek-app blijven gemapt en andere aan TouchLab-trigger-acties — zonder cross-app-conflict.
+- **OS-keymap-tool-aanpak (Karabiner/AutoHotkey/xdotool) verwijderd uit scope.** Was overcomplexity gegeven dat browsers de keystrokes al direct ontvangen.
 
 ## Wat veranderd is sinds revisie 3
 
@@ -30,7 +37,7 @@ Tijdens een sessie heeft de muzikant beide handen aan zijn instrument. TTB-cues 
 
 Voor de dirigent geldt iets vergelijkbaars: tijdens dirigeren is fysieke tablet-interactie niet praktisch. Een Leap-sensor die handgebaren herkent en via Glover als OSC of MIDI naar bridge stuurt, biedt aanraakvrije bediening.
 
-De feature is bedoeld voor elke gebruiker met een frontend, niet alleen voor Uli. Verschillende gebruikers gebruiken verschillende trigger-bronnen: USB-MIDI-pedalen, keyboards met sustain-pedaal, drumpads, of Leap-sensoren via Glover. Het systeem moet flexibel kunnen omgaan met de specifieke signalen die elke bron stuurt — vandaar protocol-agnostische learn als onderdeel van v1.
+De feature is bedoeld voor elke gebruiker met een frontend, niet alleen voor Uli. Verschillende gebruikers gebruiken verschillende trigger-bronnen: USB-MIDI-pedalen, keyboards met sustain-pedaal, drumpads, Leap-sensoren via Glover, of BLE-HID-pedalen die als toetsenbord pairen (zoals PageFlip Firefly — vaak al in gebruik voor bladmuziek-apps op iPad). Het systeem moet flexibel kunnen omgaan met de specifieke signalen die elke bron stuurt — vandaar protocol-agnostische learn als onderdeel van v1.
 
 ## Mentaal model
 
@@ -64,6 +71,7 @@ Gebruiker kan meerdere bron-naar-actie-mappings tegelijk geconfigureerd hebben. 
 - **Eén pedaal, gate-modus**: muzikant wil sample stoppen op moment van loslaten. Eén mapping: CC 64 → `gate`. Voet erop = sample speelt, voet eraf = sample stopt + queue stept.
 - **Eén pedaal, dynamisch (kort vs lang)**: muzikant wil dezelfde pedaal-bediening als de UI-trigger. Eén mapping: CC 64 → `pulse-or-gate`. Korte trap = sample speelt door tot natural end. Lange trap = sample stopt bij loslaten. Hergebruikt bestaande UI-trigger-duur-logica.
 - **Glover toggle voor dirigent**: twee gestures, twee mappings. `/glover/fist-1` → `start`, `/glover/fist-2` → `stop`. Eerste vuist start volgend slot, tweede vuist stopt en stept.
+- **4-pedaal Firefly gedeeld met forScore**: pedaal 1+2 op default page-up/page-down (forScore vangt deze in eigen app), pedaal 3+4 in PageFlip-config-app op F13/F14 gemapt. TouchLab-UI vangt F13/F14 alleen wanneer focused. Twee mappings: `keyboard F13` → `pulse`, `keyboard F14` → `stop`. Bladmuziek-omslaan en sample-trigger werken simultaan via één gepaird BLE-pedaal.
 - **Pedaal + Glover gemixt**: drie mappings actief. CC 64 → `pulse-or-gate` (rappe one-shots of vasthoud-bediening tijdens spel), `/glover/fist-1` → `start`, `/glover/fist-2` → `stop` (langere uitgesponnen samples).
 
 ### Lege queue
@@ -101,31 +109,36 @@ Mapping wordt niet ongeldig bij poort-wijziging — alleen het luister-eindpunt 
 - **Conflict-detectie tussen mappings** — bridge waarschuwt niet als gebruiker hetzelfde signaal aan twee acties mapt, of `start` zonder `stop`-tegenhanger configureert. v2.
 - **Duur-onderscheid op andere actie-paren** dan pulse↔gate (bijv. start↔stop op één signaal). v1 heeft alleen `pulse-or-gate` als duur-gebaseerde actie. v2 indien nodig.
 - **Per-mapping duur-threshold** — één globale waarde voor alle `pulse-or-gate`-mappings.
-- **Direct HID-pedaal-ondersteuning** (Firefly, andere BLE-HID-page-turners). v2 via OS-keymap-tool — zie aparte sectie verderop.
 - **MIDI- of OSC-output** (TouchLab → externe controller).
 
 ## Architectuurbeslissingen
 
-### 1. Waar gebeurt input-detectie? → Bridge (Node.js)
+### 1. Waar gebeurt input-detectie? → Bridge voor MIDI/OSC, UI voor keyboard
 
-Bridge gebruikt twee listeners:
+Bridge gebruikt twee server-side listeners:
 
-- **MIDI-listener** via Node.js MIDI-library (kandidaten: `easymidi`, `webmidi-node`, `node-midi` — keuze tbd, korte vergelijking in implementatie-sessie).
-- **OSC-listener** via Node.js OSC-library (kandidaat: `osc-js` of `node-osc` — keuze tbd) op UDP-poort, default 9100, configureerbaar via UI.
+- **MIDI-listener** via Node.js MIDI-library (zie ADR-002: easymidi).
+- **OSC-listener** via Node.js OSC-library (zie ADR-003: node-osc) op UDP-poort, default 9100, configureerbaar via UI.
 
-Beide listeners normaliseren naar **één interne event-vorm** voor downstream verwerking:
+UI gebruikt één client-side listener:
+
+- **Keyboard-listener** via DOM `keydown`/`keyup`-events op `window`. Filtert `event.repeat` om OS-key-repeat te negeren. Bij relevante keystroke (alle keystrokes tijdens learn-fase, of alleen gemapte keystrokes daarna): `event.preventDefault()` en stuur door naar bridge via WebSocket.
+
+Alle drie listeners normaliseren naar **één interne event-vorm** voor downstream verwerking:
 
 ```
 {
-  protocol: "midi" | "osc",
-  source: <device-name | osc-source-address>,
+  protocol: "midi" | "osc" | "keyboard",
+  source: <device-name | osc-source-address | "ui">,
   signature: <protocol-specifiek, zie mapping-schema>,
-  value: <number, 0..1 voor OSC, 0..127 voor MIDI>,
+  value: <number, 0..1 voor OSC, 0..127 voor MIDI, 0 of 1 voor keyboard>,
   timestamp: <ms>
 }
 ```
 
-Dit faciliteert toekomstige protocol-uitbreiding (HID, network controllers) zonder herontwerp.
+Voor keyboard-events: bridge ontvangt het event via WS van UI (in plaats van direct van een listener). Verder is downstream-behandeling identiek.
+
+Dit faciliteert toekomstige protocol-uitbreiding (HID-direct, network controllers) zonder herontwerp.
 
 ### 2. Waar woont de mapping? → Bridge-state in `session.json`
 
@@ -172,12 +185,22 @@ Mapping leeft op het audio-eindpunt zelf. Persistent, beschikbaar voor elke brow
       "thresholdActive": 0.55,
       "thresholdInactive": 0.45,
       "valueRange": { "min": 0.0, "max": 1.0 }
+    },
+    {
+      "action": "pulse",
+      "protocol": "keyboard",
+      "signature": {
+        "key": "F13"
+      },
+      "polarity": "normal"
     }
   ],
   "oscPort": 9100,
   "pulseOrGateThresholdMs": 250
 }
 ```
+
+Voor `protocol: "keyboard"` zijn `thresholdActive`, `thresholdInactive`, `valueRange` weggelaten — keystrokes zijn binair en hebben geen hysterese-tuning nodig. `polarity` blijft formeel aanwezig maar staat altijd op `"normal"` (keystroke = active, geen-keystroke = inactive).
 
 `polarity` is `normal` (active = high) of `inverted` (active = low) — afgeleid tijdens learn.
 
@@ -189,7 +212,9 @@ State-machine met twee thresholds, niet één. Voorkomt jitter rond drempel die 
 - Leap-gestures via Glover, waar gesture-confidence als float fluctueert
 - Drumpads met velocity-variatie
 
-**State-machine per mapping:**
+Voor keyboard-events is hysterese triviaal: `value` is altijd 0 of 1. Bridge passeert direct van INACTIVE naar ACTIVE op keydown (`value: 1`) en terug op keyup (`value: 0`). Geen thresholds gebruikt — voor `protocol: "keyboard"` slaat bridge de hysterese-vergelijking over.
+
+**State-machine per mapping (MIDI/OSC):**
 
 ```
 state = INACTIVE
@@ -238,12 +263,13 @@ Bij MIDI-IAC-bus en OSC-UDP is hot-plug niet emuleerbaar (poorten zijn altijd pr
 | Keyboard met sustain | MIDI | CC + andere events (filter via mapping) | normal | Hardware-arrival |
 | Drumpad | MIDI | Note On/Off met velocity | normal | Hardware-arrival |
 | BLE MIDI-pedaal (iRig BlueBoard, AirTurn-MIDI-modus) | MIDI via BLE → CoreMIDI/ALSA | CC of Note On/Off, model-afhankelijk | model-afhankelijk | BLE-pedaal-arrival |
+| BLE-HID-pedaal (PageFlip Firefly etc.) | keyboard via BLE | keystroke binary | normal | Pedaal-arrival, mock via gewone toetsenbord-input |
 | Glover + Leap | OSC of MIDI | gesture float of CC | normal | **Beschikbaar nu** |
 | Mock-Pd-patch | MIDI (IAC) en OSC (UDP) | configureerbaar | beide | **Beschikbaar nu** |
 
 ### Bluetooth MIDI in v1
 
-Bluetooth-MIDI-pedalen werken zonder bridge-aanpassingen, mits ze BLE MIDI ondersteunen (i.t.t. BLE HID — zie volgende sub-sectie). Werkwijze voor gebruiker:
+Bluetooth-MIDI-pedalen werken zonder bridge-aanpassingen. Werkwijze voor gebruiker:
 
 1. **macOS**: Audio MIDI Setup → MIDI Studio → Bluetooth Configuration → pedaal koppelen
 2. **Linux**: `bluez` + `aseqdump` voor BLE MIDI; soms vereist `bluez-alsa` of vergelijkbare bridge
@@ -251,9 +277,26 @@ Bluetooth-MIDI-pedalen werken zonder bridge-aanpassingen, mits ze BLE MIDI onder
 
 Geen aanpassingen aan bridge of UI. Standaard learn-flow, standaard mapping. **Latency-caveat:** BLE MIDI is ~10-30ms versus ~1-3ms voor wired USB MIDI; in fase 5 hardware-validatie meten of dat acceptabel is voor onze use-cases.
 
-### HID-pedalen (Firefly etc.) — niet in v1
+### BLE-HID-pedalen (Firefly etc.) in v1
 
-PageFlip Firefly en vergelijkbare BLE-HID-pedalen sturen page-up/page-down keystrokes, geen MIDI. Bridge ondersteunt deze niet direct in v1 of v2. Zie sectie "v2-uitbreiding: HID-pedalen via OS-keymap-tool" hieronder.
+BLE-HID-pedalen pairen als BLE-keyboard met het apparaat waar TouchLab-UI op draait (typisch iPad). Browser ontvangt `keydown`/`keyup`-events voor de keystrokes die het pedaal stuurt. UI vangt de events op, stuurt door naar bridge via WebSocket.
+
+**Werkwijze voor gebruiker (Firefly als voorbeeld):**
+
+1. Pedaal pairen met iPad via iOS Bluetooth-instellingen — verschijnt als toetsenbord
+2. Optioneel: PageFlip-config-app gebruiken om per pedaal-knop een specifieke keystroke te kiezen. Voor pedalen die ook bladmuziek-app moeten bedienen (forScore, etc.): laat die knoppen op page-up/page-down staan, zet de "extra" knoppen op een keystroke die forScore *niet* gebruikt — F13 t/m F19 zijn veilige keuzes
+3. Open TouchLab-UI in Safari op de iPad
+4. In TouchLab-mappings-UI: klik "trigger toevoegen" → kies actie → druk pedaal-knop → mapping geleerd
+
+**Co-existence met bladmuziek-apps**: TouchLab-UI doet `event.preventDefault()` op gemapte keystrokes — die gaan dus niet door naar andere keyboard-handlers binnen de browser-tab. Echter: zodra gebruiker naar een andere app schakelt (bijv. forScore), ontvangt TouchLab-UI geen events meer en gaan ze naar de focused app. Dit is precies het gewenste gedrag: tijdens spel staat TouchLab focused, sample-trigger-pedalen werken; tijdens lezen schakelt gebruiker naar forScore, bladmuziek-pedalen werken.
+
+**Multi-functie-pedalen (zoals 4-pedaal Firefly)**: bij modellen waar elke knop een eigen keystroke kan sturen, zijn sommige knoppen aan bladmuziek-app en andere aan TouchLab-trigger gemapt — werkt simultaan zonder conflict mits de keystroke-keuzes uniek zijn.
+
+**Caveats:**
+
+- **UI-focus vereist.** Werkt alleen als TouchLab-tab focus heeft.
+- **iPad-Safari-quirks**: niet alle keystrokes worden door Safari aan JS doorgegeven. Te valideren met test-pagina (bijv. `keyjs.dev`) voordat je nieuwe keys mapt.
+- **Auto-repeat filteren**: UI gebruikt `if (event.repeat) return;` om OS-niveau-key-repeat te negeren tijdens lange-druk-detectie.
 
 ## Mock-Pd-bron
 
@@ -269,23 +312,25 @@ Locatie van mock-patch: aparte folder `dev-tools/`, niet in productie-Pd-pad. Wo
 
 ## Voorgestelde fasering
 
-**Fase 1 — bridge dual-protocol input + WebSocket-events naar UI (~2u)**
+**Fase 1 — bridge dual-protocol input + UI keyboard-listener + WebSocket-events (~2.5u)**
 
-- Bridge installeert MIDI-library + OSC-library (keuzes maken aan begin van fase)
-- Bij startup: detecteer beschikbare MIDI-devices, open OSC UDP-listener op default-poort, log beide
-- Bij MIDI-input of OSC-input: bridge normaliseert naar interne event-vorm, stuurt door als WebSocket-message naar UI
-- UI heeft een live-debug-panel dat raw events toont (alleen voor learn-fase, na fase 2 onnodig maar handig om aan te laten in dev-mode)
-- Test: mock-Pd MIDI binary → event in UI; mock-Pd OSC → event in UI
+- Bridge installeert MIDI-library + OSC-library
+- Bridge bij startup: detecteer beschikbare MIDI-devices, open OSC UDP-listener op default-poort, log beide
+- Bridge bij MIDI- of OSC-input: normaliseer naar interne event-vorm, stuur door als WebSocket-message naar UI
+- UI implementeert keyboard-listener op `window`: `keydown`/`keyup` met `event.repeat`-filter, normaliseert naar interne event-vorm, stuurt naar bridge via WS (omgekeerde richting van MIDI/OSC)
+- UI heeft live-debug-panel dat alle ruwe events toont (van alle drie protocollen, voor learn-fase)
+- Test: mock-Pd MIDI binary → event in UI; mock-Pd OSC → event in UI; gewone toetsenbord-keystroke → event terug naar bridge
 - Geen mapping, geen actie-dispatch nog — alleen detectie + transport
 
 **Fase 1.5 — mock-Pd-patch (~1u)**
 
-Kan parallel aan fase 1 of erna. Niet kritisch maar handig voor validatie van fase 1 zonder hardware. Drie modi (zie hierboven).
+Kan parallel aan fase 1 of erna. Niet kritisch maar handig voor validatie van fase 1 zonder hardware. Drie modi (zie hierboven). Keyboard-events worden gemockt via gewone toetsenbord-input op de browser-tab — geen aparte mock nodig.
 
 **Fase 2 — protocol-agnostische learn-UI + mapping-storage (~2u)**
 
 - Mappings-lijst-UI: lege state, "+ trigger toevoegen" knop
-- Add-flow: kies actie-type uit dropdown → "druk + houd + laat los op je bron" → bridge accepteert eerstvolgende event-stream → leidt af: protocol, signature, polariteit, waarde-range, threshold-paar (sane defaults uit range) → mapping toegevoegd aan array
+- Add-flow: kies actie-type uit dropdown → "druk + houd + laat los op je bron" → bridge (of UI voor keyboard) accepteert eerstvolgende event-stream → leidt af: protocol, signature, polariteit, waarde-range, threshold-paar (sane defaults uit range) → mapping toegevoegd aan array
+- Voor `protocol: "keyboard"`: minder velden — alleen `signature: { key }`, geen thresholds of range
 - Mapping persistent in `session.json` op bridge
 - Per mapping: actie-label, bron-info, status-indicator, verwijder-knop
 - OSC-poort configuratie-veld onder mappings-lijst, met "wijziging actief na restart" hint
@@ -314,30 +359,7 @@ Kan parallel aan fase 1 of erna. Niet kritisch maar handig voor validatie van fa
 - Latency-meting fysieke voet → audio-out, separat voor wired USB en BLE MIDI
 - Hardware-specifieke quirks documenteren als gevonden
 - Inversed-polarity-pedalen testen (DIY-converters)
-
-## v2-uitbreiding: HID-pedalen via OS-keymap-tool
-
-Veel musici gebruiken bladmuziek-pedalen zoals PageFlip Firefly. Die zijn BLE-HID, niet BLE-MIDI — sturen keystrokes (page-up / page-down). Bridge implementeert geen eigen HID-listener om de architectuur strict MIDI+OSC te houden. In plaats daarvan: gebruiker installeert een OS-keymap-tool die de keystrokes detecteert en een OSC-bericht naar bridge stuurt.
-
-### Aanpak per OS
-
-- **macOS**: Karabiner-Elements heeft "Complex Modifications" die een keystroke kunnen mappen naar een shell-script. Script stuurt OSC via `oscsend` (van `liblo`) of een mini-Node-script naar bridge.
-- **Linux**: `xdotool` of `evdev`-listener met scripts. Vergelijkbare aanpak.
-- **Windows**: AutoHotkey-script dat keystrokes opvangt en OSC stuurt.
-
-### Beperking voor v2: alleen play/stop
-
-Firefly heeft twee fysieke knoppen (forward/back). v2-mapping: forward → `start`, back → `stop`. Geen pulse, geen gate, geen pulse-or-gate — die vereisen een press-and-hold-detection die HID-pedalen op systeem-niveau niet betrouwbaar leveren (sommige sturen alleen "key-released-after-N-ms" als de native repeat-delay).
-
-### Wat in v2 gebouwd wordt
-
-Geen bridge-code-uitbreiding. Wel:
-
-1. **Documentatie** in repo: setup-handleiding per OS voor Firefly + Karabiner/AutoHotkey/xdotool. Met voorbeeld-config-files.
-2. **OSC-conventie**: aanbevolen path `/touchlab/pedal/forward` en `/touchlab/pedal/back` zodat handleidingen consistent zijn. Gebruiker mapt in TouchLab-UI deze paths aan `start` en `stop`.
-3. **UI-tag**: bron-info-display herkent deze paths en toont "Firefly via OS-keymap" als hint, voor herkenbaarheid.
-
-Schatting: ~2u werk in totaal (documentatie + UI-tag), geen architectuur-werk.
+- Firefly-pairing en multi-knop-mapping valideren met echte hardware
 
 ## Wat dit níet doet
 
@@ -360,6 +382,9 @@ Schatting: ~2u werk in totaal (documentatie + UI-tag), geen architectuur-werk.
 - **OSC-poort-wijziging zonder restart.** Bridge moet UDP-listener netjes sluiten en heropenen. Bij falen blijft mogelijk oude listener actief, of crasht bridge. Te robust testen in fase 2.
 - **`pulse-or-gate` duur-threshold-tuning.** Default 250ms is overgenomen van UI-trigger-logica, maar voet-mechaniek is trager dan vinger-touch. Mogelijk verstandig om voor pedaal-bronnen een hogere default te overwegen — kan empirisch afgesteld worden in fase 4 met mock-Pd. Voor v1 één globale waarde, gebruiker stelt zelf bij in UI als nodig.
 - **BLE MIDI latency en jitter.** Bluetooth heeft inherent meer latency en variatie dan wired USB. Voor uitgesponnen samples acceptabel; voor strikte timing-bediening (sample op een 16e laten landen) merkbaar. Te valideren in fase 5. Mogelijk advies in documentatie: voor strikte timing wired pedaal gebruiken.
+- **Browser-keystroke-quirks (iPad-Safari).** Safari geeft niet alle keystrokes door aan JS — sommige function-keys kunnen door iOS afgevangen worden. F13 t/m F19 zijn relatief veilig op iPad maar te valideren met `keyjs.dev` of vergelijkbare test-pagina voordat een mapping vastgelegd wordt.
+- **TouchLab-UI moet focus hebben voor keyboard-events.** Trigger werkt niet als gebruiker naar andere app schakelt. Documenteren als verwacht gedrag — werkt typisch in gebruikers voordeel (bladmuziek-pedalen werken in bladmuziek-app, sample-trigger-pedalen in TouchLab), maar onbekend voor nieuwe gebruikers.
+- **Keyboard-mapping-conflicten met andere browser-shortcuts.** Cmd+R, Cmd+T, etc. blijven browser-acties; `event.preventDefault()` kan ze niet onderscheppen. Bij learn-flow waarschuwen als gebruiker een browser-shortcut probeert te mappen.
 
 ## Open vragen voor implementatie-sessie
 
@@ -384,5 +409,6 @@ Schatting: ~2u werk in totaal (documentatie + UI-tag), geen architectuur-werk.
 - ADR-001: Protocol-agnostische event-router voor trigger-input — in `notes/adr/`.
 - ADR-002: MIDI-library-keuze easymidi — in `notes/adr/`.
 - ADR-003: OSC-library-keuze node-osc — in `notes/adr/`.
+- ADR-004: Keyboard als derde protocol in event-router — in `notes/adr/`.
 - Architectuurvraag E in `overdrachtsdocument-werksessie-2026-05-01-avond.md`, sectie 3 — bevestigde gate-mode-werking in queue-context.
 - `QUEUE-ADVANCE-ON-RELEASE-V1`-marker in UI-code — pre-existing alignment voor trigger-flow.
